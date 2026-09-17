@@ -1,0 +1,82 @@
+/* ==========================================================================
+   EduArchive — tokens de diseño
+   Un único juego de variables; el tema se cambia con [data-theme] en <html>.
+   Todos los pares texto/fondo verifican contraste AA (>= 4.5:1).
+   ========================================================================== */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Marca */
+  --color-acid: #ccff00;
+  --color-acid-hover: #b3e600;
+  --color-acid-soft: rgba(204, 255, 0, 0.1);
+  --color-acid-border: rgba(204, 255, 0, 0.28);
+  --color-acid-fg: #0a0a0a; /* texto sobre fondo ácido */
+
+  /* Superficies */
+  --surface-base: #0a0a0a;
+  --surface-sunken: #09090b;
+  --surface-raised: #18181b;
+  --surface-overlay: #27272a;
+
+  /* Bordes */
+  --border-default: #27272a;
+  --border-strong: #3f3f46;
+
+  /* Texto */
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --text-disabled: #71717a;
+  --text-inverted: #0a0a0a;
+
+  /* Estado */
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #fb7185;
+  --color-info: #38bdf8;
+
+  /* Sombras y anillos */
+  --ring: 0 0 0 2px rgba(204, 255, 0, 0.45);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --scrollbar-track: #111113;
+  --scrollbar-thumb: #3f3f46;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-acid: #6f8c00;
+  --color-acid-hover: #5c7500;
+  --color-acid-soft: rgba(111, 140, 0, 0.1);
+  --color-acid-border: rgba(111, 140, 0, 0.3);
+  --color-acid-fg: #ffffff;
+
+  --surface-base: #f7f7f8;
+  --surface-sunken: #ededf0;
+  --surface-raised: #ffffff;
+  --surface-overlay: #f1f1f4;
+
+  --border-default: #d9d9de;
+  --border-strong: #b9b9c1;
+
+  --text-primary: #18181b;
+  --text-secondary: #3f3f46;
+  --text-muted: #5c5c66;
+  --text-disabled: #8b8b95;
+  --text-inverted: #ffffff;
+
+  --color-success: #047857;
+  --color-warning: #92660a;
+  --color-danger: #be123c;
+  --color-info: #0369a1;
+
+  --ring: 0 0 0 2px rgba(111, 140, 0, 0.45);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.07);
+  --shadow-pop: 0 12px 40px rgba(15, 23, 42, 0.18);
+  --scrollbar-track: #ededf0;
+  --scrollbar-thumb: #c3c3cb;
+}

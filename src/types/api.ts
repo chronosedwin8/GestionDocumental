@@ -1,0 +1,732 @@
+/**
+ * Tipos del contrato de API (docs/API_CONTRACT.md).
+ * Se mantienen en snake_case — igual que el JSON — para evitar una capa de
+ * conversión que ya causó errores en la versión anterior (author/created_by).
+ */
+
+/* ---------------------------------------------------------------- errores */
+
+export interface ApiErrorBody {
+  error: { code: string; message: string; details?: unknown };
+}
+
+/** Códigos que el cliente trata de forma especial. */
+export const ERROR_CODES = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  HASH_MISMATCH: 'HASH_MISMATCH',
+  RATE_LIMITED: 'RATE_LIMITED',
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
+  STORAGE_NOT_CONFIGURED: 'STORAGE_NOT_CONFIGURED',
+  AI_NOT_CONFIGURED: 'AI_NOT_CONFIGURED',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  INTERNAL: 'INTERNAL',
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES] | string;
+
+/* ------------------------------------------------------------ paginación */
+
+export interface Paginated<T> {
+  data: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface PageQuery {
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+}
+
+/* -------------------------------------------------------------- catálogos */
+
+export interface Module {
+  code: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  color: string;
+  s3_folder: string;
+  folio_prefix: string;
+  radicado_prefix: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface Role {
+  code: string;
+  name: string;
+  description: string | null;
+  has_full_access: boolean;
+  can_manage_users: boolean;
+  is_system: boolean;
+}
+
+export interface DocumentStatus {
+  code: string;
+  name: string;
+  color: string;
+  is_terminal: boolean;
+  allows_edit: boolean;
+  sort_order: number;
+}
+
+export type DispositionAction = 'KEEP' | 'SELECT' | 'DELETE';
+
+export interface Disposition {
+  code: string;
+  name: string;
+  color: string;
+  action: DispositionAction;
+}
+
+export interface NotificationType {
+  code: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export interface CorrespondenceType {
+  code: string;
+  name: string;
+  prefix: string;
+  response_days: number | null;
+}
+
+export interface PersonType {
+  code: string;
+  name: string;
+}
+
+export interface PublicSettings {
+  max_file_size_mb: number;
+  /** MIME -> extensiones permitidas. */
+  allowed_mime_types: Record<string, string[]>;
+  trash_retention_days: number;
+  password_min_length: number;
+  app_name: string;
+  institution_name: string;
+  ai_enabled: boolean;
+  storage_configured: boolean;
+  smtp_configured: boolean;
+  /** Opcionales documentados en el plan; el cliente tolera su ausencia. */
+  require_trd?: boolean;
+  auto_folio?: boolean;
+  hr_module_code?: string;
+  academic_module_code?: string;
+}
+
+export interface Catalogs {
+  modules: Module[];
+  roles: Role[];
+  document_statuses: DocumentStatus[];
+  dispositions: Disposition[];
+  notification_types: NotificationType[];
+  correspondence_types: CorrespondenceType[];
+  person_types: PersonType[];
+  settings: PublicSettings;
+}
+
+/* --------------------------------------------------------------- usuarios */
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  role_code: string;
+  department_code: string | null;
+  allowed_modules: string[] | null;
+  is_active: boolean;
+  must_change_password: boolean;
+  onboarding_done: boolean;
+  avatar_url: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EffectiveModule {
+  code: string;
+  can_read: boolean;
+  can_write: boolean;
+}
+
+export interface Me extends User {
+  effective_modules: EffectiveModule[];
+  role: Role;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  expiresIn: number;
+  user: Me;
+}
+
+export interface RefreshResponse {
+  accessToken: string;
+  expiresIn: number;
+}
+
+export interface UserSession {
+  id: string;
+  user_agent: string | null;
+  ip: string | null;
+  created_at: string;
+  /** El servidor lo devuelve aunque el contrato no lo liste. */
+  last_used_at?: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+}
+
+/* ------------------------------------------------------------- documentos */
+
+export type AiStatus = 'PENDING' | 'DONE' | 'FAILED' | 'SKIPPED';
+
+export interface DocumentAuthor {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+export interface DocumentMetadataEntry {
+  key: string;
+  value: string | null;
+  is_extracted: boolean;
+  confidence: number | null;
+}
+
+export interface ApiDocument {
+  id: string;
+  title: string;
+  type: string;
+  module_code: string;
+  /** null significa "sin foliar" — no existe el valor mágico 'Pendiente'. */
+  folio_index: string | null;
+  s3_key: string;
+  s3_bucket: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  sha256: string | null;
+  page_count: number | null;
+  status_code: string;
+  /** Estado archivístico previo a BLOQUEO_ADMIN / APROBADO. */
+  previous_status_code?: string | null;
+  author_id: string | null;
+  author?: DocumentAuthor | null;
+  summary: string | null;
+  ai_status: AiStatus;
+  category: string | null;
+  subcategory: string | null;
+  person_id: string | null;
+  academic_period_id: string | null;
+  retention_end_date: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  approval_sha256: string | null;
+  deleted_at: string | null;
+  delete_reason: string | null;
+  permanent_delete_at: string | null;
+  tags: string[];
+  metadata: DocumentMetadataEntry[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Forma reducida que devuelven `/me/bookmarks` y `/me/recent`: el servidor
+ * selecciona solo estas columnas, no el documento completo.
+ */
+export type DocumentSummary = Pick<
+  ApiDocument,
+  | 'id'
+  | 'title'
+  | 'type'
+  | 'module_code'
+  | 'folio_index'
+  | 'status_code'
+  | 'file_type'
+  | 'file_size'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+export interface RecentDocument extends DocumentSummary {
+  viewed_at: string;
+}
+
+export interface DocumentNote {
+  id: string;
+  document_id: string;
+  author_id: string;
+  author: { id: string; full_name: string };
+  text: string;
+  created_at: string;
+}
+
+export interface DocumentVersion {
+  id: string;
+  document_id: string;
+  version_number: string;
+  s3_key: string;
+  file_name: string;
+  file_size: number;
+  sha256: string | null;
+  changes: string | null;
+  author_id: string;
+  author: { id: string; full_name: string };
+  created_at: string;
+}
+
+export type RelationType = 'PARENT_CHILD' | 'BIDIRECTIONAL' | 'STAPLED';
+
+export interface DocumentRelation {
+  id: string;
+  source_document_id: string;
+  target_document_id: string;
+  relation_type: RelationType;
+  created_by: string;
+  created_at: string;
+  target_document: {
+    id: string;
+    title: string;
+    type: string;
+    status_code: string;
+    module_code: string;
+    created_at: string;
+  };
+}
+
+export interface DocumentPermission {
+  role_code: string;
+  can_read: boolean;
+  can_write: boolean;
+  can_delete: boolean;
+}
+
+export interface CustodyEvent {
+  id: string;
+  document_id: string | null;
+  document_title: string;
+  document_module: string;
+  s3_key: string | null;
+  event_type: string;
+  event_details: Record<string, unknown> | null;
+  actor_id: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  created_at: string;
+}
+
+export interface DownloadUrl {
+  url: string;
+  expires_at: string;
+}
+
+export interface DocumentTextResponse {
+  text: string;
+  truncated: boolean;
+}
+
+export interface DocumentTrdInfo {
+  rule: RetentionRule | null;
+  retention_end_date: string | null;
+  candidates: RetentionRule[];
+}
+
+/* ------------------------------------------------------------ expedientes */
+
+export type ExpedienteEstado = 'ABIERTO' | 'CERRADO' | 'TRANSFERIDO';
+
+export interface Expediente {
+  id: string;
+  radicado: string;
+  titulo: string;
+  descripcion: string | null;
+  module_code: string;
+  estado: ExpedienteEstado;
+  fecha_apertura: string;
+  fecha_cierre: string | null;
+  responsable_id: string | null;
+  responsable?: DocumentAuthor | null;
+  serie: string | null;
+  subserie: string | null;
+  person_id: string | null;
+  person?: PersonSummary | null;
+  academic_period_id: string | null;
+  is_correspondence: boolean;
+  correspondence_type_code: string | null;
+  sender: string | null;
+  recipient: string | null;
+  response_due_at: string | null;
+  responded_at: string | null;
+  document_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ExpedienteDocumentRef = Pick<
+  ApiDocument,
+  | 'id'
+  | 'title'
+  | 'type'
+  | 'folio_index'
+  | 'status_code'
+  | 'file_type'
+  | 'file_size'
+  | 'created_at'
+  | 'module_code'
+>;
+
+export interface ExpedienteDocument {
+  orden: number;
+  fecha_inclusion: string;
+  incluido_por: string | null;
+  document: ExpedienteDocumentRef;
+}
+
+export interface ExpedienteDetail extends Expediente {
+  documents: ExpedienteDocument[];
+}
+
+/* -------------------------------------------------------- TRD y categorías */
+
+export interface RetentionRule {
+  id: string;
+  module_code: string;
+  document_type: string;
+  retention_years: number;
+  disposition_code: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  module_code: string;
+  parent_id: string | null;
+  is_active: boolean;
+  sort_order: number;
+  subcategories?: Category[];
+}
+
+/* -------------------------------------------------------------- préstamos */
+
+export type LoanStatus = 'ACTIVE' | 'RETURNED' | 'OVERDUE';
+
+export interface Loan {
+  id: string;
+  document_id: string;
+  document_title: string;
+  module_code: string;
+  loaned_to: string;
+  loaned_by: string;
+  loaned_to_user: DocumentAuthor;
+  loaned_by_user: DocumentAuthor;
+  loan_date: string;
+  expected_return_date: string;
+  actual_return_date: string | null;
+  purpose: string;
+  status: LoanStatus;
+  notes: string | null;
+  created_at: string;
+}
+
+/* --------------------------------------------------------- notificaciones */
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type_code: string;
+  title: string;
+  message: string;
+  document_id: string | null;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}
+
+/* ---------------------------------------------------------- eliminaciones */
+
+export type DeletionRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface DeletionRequest {
+  id: string;
+  document_id: string;
+  document_title: string;
+  document_module: string;
+  requested_by: string;
+  requested_by_name: string;
+  requested_at: string;
+  reason: string;
+  status: DeletionRequestStatus;
+  reviewed_by: string | null;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+}
+
+export interface DeletionLog {
+  id: string;
+  document_id: string;
+  document_title: string;
+  document_module: string;
+  deleted_by: string;
+  deleted_by_name: string;
+  deleted_at: string;
+  reason: string;
+  was_request: boolean;
+  original_requester: string | null;
+  acta_s3_key: string | null;
+}
+
+/* -------------------------------------------------------------- auditoría */
+
+export interface AuditLog {
+  id: string;
+  user_id: string | null;
+  user_email: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  details: unknown;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+/* --------------------------------------------------------------- personas */
+
+export interface PersonSummary {
+  id: string;
+  type_code: string;
+  document_number: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface Person extends PersonSummary {
+  email: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  hire_date: string | null;
+  termination_date: string | null;
+  position: string | null;
+  grade: string | null;
+  extra: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  completeness?: { required: number; present: number; missing: string[] };
+}
+
+export interface PersonEvent {
+  id: string;
+  person_id: string;
+  event_type: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  document_id: string | null;
+  created_by: string;
+  created_by_user: { id: string; full_name: string };
+  created_at: string;
+}
+
+export interface AcademicPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_current: boolean;
+}
+
+export interface RequiredDocument {
+  document_type: string;
+  is_mandatory: boolean;
+  /** Presentes en la respuesta del servidor; opcionales al escribir. */
+  person_type_code?: string;
+  sort_order?: number;
+}
+
+/* ------------------------------------------------------------------ ayuda */
+
+export interface HelpArticle {
+  id: string;
+  slug: string;
+  title: string;
+  body_md: string;
+  module_code: string | null;
+  role_codes: string[] | null;
+  sort_order: number;
+  updated_at: string;
+}
+
+/* ---------------------------------------------------------------- sistema */
+
+export interface MaskedSecret {
+  masked: true;
+  hint: string;
+}
+
+export interface SystemConfigItem {
+  key: string;
+  value: unknown;
+  is_secret: boolean;
+  description: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface JobRun {
+  id: string;
+  job: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'RUNNING' | 'OK' | 'ERROR';
+  details: unknown;
+}
+
+export interface JobInfo {
+  job: string;
+  schedule: string;
+  last_run: JobRun | null;
+}
+
+export interface SystemHealth {
+  status: 'ok' | 'degraded';
+  db: boolean;
+  storage_configured: boolean;
+  ai_configured: boolean;
+  smtp_configured: boolean;
+  version: string;
+  uptime_s: number;
+}
+
+export interface StorageTestResult {
+  success: boolean;
+  message: string;
+  details: { bucket: string; base_folder: string; folder_exists: boolean };
+}
+
+export interface SmtpTestResult {
+  success: boolean;
+  message: string;
+}
+
+/* ----------------------------------------------------------------- acceso */
+
+export interface AccessMatrixEntry {
+  role_code: string;
+  module_code: string;
+  can_read: boolean;
+  can_write: boolean;
+}
+
+/* ----------------------------------------------------------- estadísticas */
+
+export interface CodeTotal {
+  code: string;
+  total: number;
+}
+
+export interface DashboardStats {
+  total_documents: number;
+  documents_this_month: number;
+  documents_by_module: CodeTotal[];
+  documents_by_status: CodeTotal[];
+  retention_alerts: number;
+  pending_actions: {
+    deletion_requests: number;
+    overdue_loans: number;
+    without_trd: number;
+    without_folio: number;
+    without_expediente: number;
+  };
+  storage: { bytes: number | null; configured: boolean };
+  recent_activity: AuditLog[];
+  retention_semaphore: { module_code: string; total: number; alerts: number }[];
+}
+
+export interface GeneralStats {
+  kpis: { label: string; value: number | string; hint?: string }[];
+  trd_compliance: { module_code: string; total: number; with_trd: number }[];
+  retention_semaphore: { module_code: string; ok: number; warning: number; critical: number }[];
+  loans: { active: number; overdue: number; returned: number };
+  expedientes: { abiertos: number; cerrados: number; transferidos: number };
+}
+
+export interface TrendStats {
+  timeline: { month: string; total: number }[];
+  by_module_type: { module_code: string; type: string; total: number }[];
+  speed: { month: string; avg_days: number }[];
+  top_types: { type: string; total: number }[];
+}
+
+export interface AlertStats {
+  /** El servidor emite `retention` (no `retention_7d`, que sí usa el contrato). */
+  counts: { retention: number; overdue_loans: number; pending_deletions: number };
+  ret7: ApiDocument[];
+  overdue_loans: Loan[];
+  pending_deletions: DeletionRequest[];
+}
+
+export interface ModuleStats {
+  module_code: string;
+  total_documents: number;
+  documents_this_month: number;
+  by_status: CodeTotal[];
+  by_type: { type: string; total: number }[];
+  without_folio: number;
+  without_trd: number;
+  storage_bytes: number | null;
+}
+
+export type MonthlyStatsRow = { month: string } & Record<string, string | number>;
+
+/* --------------------------------------------------------------- búsqueda */
+
+export interface SemanticSearchResult {
+  explanation: string;
+  documents: ApiDocument[];
+}
+
+export interface GlobalSearchResult {
+  documents: ApiDocument[];
+  expedientes: Expediente[];
+  people: PersonSummary[];
+}
+
+/* --------------------------------------------------------------------- IA */
+
+export interface AiAnalyzeResult {
+  summary: string;
+  tags: string[];
+}
+
+export interface ChatHistoryEntry {
+  role: 'user' | 'ai';
+  text: string;
+}
+
+/* --------------------------------------------------------- SSE de eventos */
+
+export interface DocumentUpdatedEvent {
+  id: string;
+  module_code: string;
+}

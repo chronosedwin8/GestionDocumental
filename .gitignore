@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencias y artefactos
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+
+# Entorno / secretos
+.env
+.env.local
+.env.*.local
+server/.env
+server/.migration-credentials.txt
+
+# Datos y credenciales del sistema anterior (contienen llaves reales)
+datos.md
+docs/legacy/data/
+docs/legacy/supabase_openapi.json
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Configuración local de Claude Code (puede contener credenciales)
+.claude/settings.local.json

@@ -1,0 +1,147 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------------------------------
+   Base. Sin !important globales: los componentes controlan su propio color.
+   -------------------------------------------------------------------------- */
+@layer base {
+  * {
+    border-color: var(--border-default);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background-color: var(--surface-base);
+    color: var(--text-secondary);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--text-primary);
+    font-family: 'Space Grotesk', Inter, sans-serif;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  a {
+    color: var(--color-info);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-acid);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+    color: var(--text-primary);
+    background-color: var(--surface-overlay);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-disabled);
+    opacity: 1;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Componentes reutilizables (identidad visual: superficies sutiles + acento)
+   -------------------------------------------------------------------------- */
+@layer components {
+  .card {
+    @apply rounded-card border bg-surface-raised;
+    border-color: var(--border-default);
+    box-shadow: var(--shadow-card);
+  }
+
+  .panel {
+    @apply rounded-card border p-4 md:p-6;
+    background-color: var(--surface-raised);
+    border-color: var(--border-default);
+  }
+
+  .kbd {
+    @apply rounded border px-1.5 py-0.5 font-mono text-[10px];
+    background-color: var(--surface-overlay);
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+  }
+
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(to right, var(--border-default) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border-default) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 12px var(--color-acid-soft);
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

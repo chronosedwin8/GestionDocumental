@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduArchive SGDEA - Sistema de Gestión Documental</title>
+    <meta name="description"
+        content="EduArchive SGDEA: Sistema de Gestión de Documentos Electrónicos de Archivo para instituciones educativas en Colombia.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar glass">
+        <div class="nav-container">
+            <a href="#hero" class="logo">
+                <span class="logo-icon">📁</span>
+                EduArchive<span class="text-acid">SGDEA</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#caracteristicas">Características</a></li>
+                <li><a href="#ventajas">Ventajas</a></li>
+                <li><a href="#legal">Marco Legal</a></li>
+                <li><a href="#galeria">Galería</a></li>
+                <li><a href="#planes">Planes</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+            <button class="menu-toggle" id="mobile-menu" aria-label="Abrir menú">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </button>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="hero" class="hero bg-grid">
+            <div class="hero-content">
+                <div class="badge animate-fade-in">🚀 Versión 1.0 Disponible</div>
+                <h1 class="animate-slide-up text-glow">Transforma la Gestión Documental Educativa</h1>
+                <p class="hero-subtitle animate-slide-up delay-1">
+                    El primer Sistema de Gestión de Documentos Electrónicos de Archivo diseñado exclusivamente para
+                    colegios en Colombia. Cumple la norma, optimiza procesos y asegura tu información con AWS S3 y
+                    tecnología IA.
+                </p>
+                <div class="hero-actions animate-slide-up delay-2">
+                    <a href="#planes" class="btn btn-acid">Ver Planes y Precios</a>
+                    <a href="#caracteristicas" class="btn btn-outline">Descubrir Más</a>
+                </div>
+            </div>
+            <div class="hero-glow"></div>
+        </section>
+
+        <!-- Características Section -->
+        <section id="caracteristicas" class="section">
+            <div class="container">
+                <h2 class="section-title">Características <span class="text-acid">Principales</span></h2>
+                <div class="grid features-grid">
+                    <div class="card glass">
+                        <div class="card-icon text-acid">☁️</div>
+                        <h3>Almacenamiento en AWS S3</h3>
+                        <p>Infraestructura en la nube inmutable con Amazon S3. Tus documentos seguros con S3 Object Lock
+                            para evitar modificaciones no autorizadas.</p>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-icon text-acid">🤖</div>
+                        <h3>Búsqueda Inteligente IA</h3>
+                        <p>Encuentra cualquier documento usando lenguaje natural gracias a nuestra integración avanzada
+                            con Gemini AI. Extracción automática de metadatos.</p>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-icon text-acid">🎓</div>
+                        <h3>Gestión Modular</h3>
+                        <p>Módulos especializados para Expediente Académico, Talento Humano, Financiero y
+                            Administrativo. Todo en un solo lugar.</p>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-icon text-acid">🔐</div>
+                        <h3>Seguridad Avanzada</h3>
+                        <p>Control de acceso basado en roles (RBAC) impulsado por Supabase, auditoría completa tipo
+                            CloudTrail y cifrado de extremo a extremo.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ventajas Section -->
+        <section id="ventajas" class="section bg-elevated">
+            <div class="container">
+                <h2 class="section-title">¿Por qué elegir <span class="text-acid">EduArchive</span>?</h2>
+                <div class="grid advantages-grid">
+                    <div class="advantage-item">
+                        <div class="adv-number text-acid">01</div>
+                        <div class="adv-content">
+                            <h3>Cero Papel</h3>
+                            <p>Reduce costos operativos y de almacenamiento físico. Digitaliza tu archivo histórico y
+                                gestiona el nuevo de forma 100% electrónica.</p>
+                        </div>
+                    </div>
+                    <div class="advantage-item">
+                        <div class="adv-number text-acid">02</div>
+                        <div class="adv-content">
+                            <h3>Productividad</h3>
+                            <p>Automatiza flujos de trabajo, aprobaciones y centraliza la búsqueda de expedientes de
+                                estudiantes y docentes en segundos.</p>
+                        </div>
+                    </div>
+                    <div class="advantage-item">
+                        <div class="adv-number text-acid">03</div>
+                        <div class="adv-content">
+                            <h3>Auditoría y Trazabilidad</h3>
+                            <p>Registro inalterable de cada acción: quién vio, editó o descargó un documento. Cumple con
+                                las exigencias de las secretarías de educación.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Galería Section -->
+        <section id="galeria" class="section bg-grid">
+            <div class="container">
+                <h2 class="section-title">Galería de <span class="text-acid">Imágenes</span></h2>
+                <div class="gallery-wrapper glass">
+                    <div class="gallery-container">
+                        <div class="gallery-track" id="gallery-track">
+                            <div class="gallery-slide"><img src="img/1.jpg" alt="Dashboard Panel General"></div>
+                            <div class="gallery-slide"><img src="img/2.jpg" alt="Gestión Académica"></div>
+                            <div class="gallery-slide"><img src="img/3.jpg" alt="Carga Masiva de Documentos"></div>
+                            <div class="gallery-slide"><img src="img/4.jpg" alt="Análisis de IA Documental"></div>
+                            <div class="gallery-slide"><img src="img/5.jpg" alt="Estadísticas y KPI"></div>
+                            <div class="gallery-slide"><img src="img/6.jpg" alt="Captura de Pantalla 6"></div>
+                            <div class="gallery-slide"><img src="img/7.jpg" alt="Captura de Pantalla 7"></div>
+                            <div class="gallery-slide"><img src="img/8.jpg" alt="Captura de Pantalla 8"></div>
+                        </div>
+                    </div>
+                    <button class="gallery-btn prev" id="prev-btn" aria-label="Anterior">&#10094;</button>
+                    <button class="gallery-btn next" id="next-btn" aria-label="Siguiente">&#10095;</button>
+                    <div class="gallery-indicators" id="gallery-indicators"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Marco Legal Section -->
+        <section id="legal" class="section">
+            <div class="container">
+                <div class="legal-wrapper glass-light">
+                    <h2 class="section-title">Cumplimiento <span class="text-acid">Normativo Colombiano</span></h2>
+                    <p class="legal-intro">EduArchive SGDEA está diseñado desde sus cimientos para cumplir con el marco
+                        jurídico nacional respecto a la gestión documental e información.</p>
+
+                    <div class="legal-grid">
+                        <div class="legal-card">
+                            <h4>Ley 594 de 2000</h4>
+                            <p>Ley General de Archivos. Cumplimiento de los procesos archivísticos, Tablas de Retención
+                                Documental (TRD) y ciclo de vida del documento.</p>
+                        </div>
+                        <div class="legal-card">
+                            <h4>Ley 1581 de 2012</h4>
+                            <p>Protección de Datos Personales (Habeas Data). Aseguramos la privacidad de la información
+                                de estudiantes, padres y empleados.</p>
+                        </div>
+                        <div class="legal-card">
+                            <h4>Acuerdo 002 de 2014</h4>
+                            <p>AGN - Criterios básicos para la creación, conformación, organización, control y consulta
+                                de los expedientes de archivo.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Planes Section -->
+        <section id="planes" class="section bg-grid">
+            <div class="container">
+                <h2 class="section-title">Planes y <span class="text-acid">Precios</span></h2>
+                <div class="pricing-grid">
+                    <!-- Plan Mensual -->
+                    <div class="pricing-card glass">
+                        <h3>Mensual Institucional</h3>
+                        <div class="price">
+                            <span class="currency">$</span>1.700.000 <span class="period">COP / mes</span>
+                        </div>
+                        <p class="pricing-desc">Ideal para probar la transformación digital en tu institución.</p>
+                        <ul class="feature-list">
+                            <li>Almacenamiento S3 (500GB)</li>
+                            <li>1 Usuario</li>
+                            <li>Búsqueda con IA Básica</li>
+                            <li>Soporte L-V</li>
+                            <li>Cumplimiento Normativo</li>
+                        </ul>
+                        <button class="btn btn-outline w-full mt-auto">Contactar Ventas</button>
+                    </div>
+
+                    <!-- Plan Anual (Destacado) -->
+                    <div class="pricing-card glass active-plan">
+                        <div class="popular-badge">Más Rentable</div>
+                        <h3>Anual Premium</h3>
+                        <div class="price text-acid">
+                            <span class="currency">$</span>10.000.000 <span class="period">COP / año</span>
+                        </div>
+                        <p class="pricing-desc">La solución completa para la gestión total a largo plazo.</p>
+                        <ul class="feature-list">
+                            <li><strong>Ahorro de más de $3.000.000 COP</strong></li>
+                            <li>Almacenamiento S3 (1TB)</li>
+                            <li>Usuarios Ilimitados</li>
+                            <li>Búsqueda Semántica IA Avanzada</li>
+                            <li>Soporte Prioritario 24/7</li>
+                            <li>Migración de Datos Asistida</li>
+                        </ul>
+                        <button class="btn btn-acid w-full mt-auto">Adquirir Plan Anual</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq" class="section">
+            <div class="container faq-container">
+                <h2 class="section-title">Preguntas <span class="text-acid">Frecuentes</span></h2>
+                <div class="accordion">
+                    <div class="accordion-item glass">
+                        <button class="accordion-header">
+                            ¿Dónde se almacenan los documentos de mi colegio?
+                            <span class="icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <p>Todos los documentos se almacenan de manera segura en Amazon Web Services (AWS) S3.
+                                Utilizamos políticas de Object Lock para garantizar la inmutabilidad de los archivos,
+                                asegurando que no puedan ser alterados o eliminados accidentalmente, cumpliendo con los
+                                estándares de archivo histórico.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item glass">
+                        <button class="accordion-header">
+                            ¿El sistema cumple con el Archivo General de la Nación (AGN)?
+                            <span class="icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <p>Sí, EduArchive SGDEA está parametrizado para soportar las Tablas de Retención Documental
+                                (TRD) y cumple con las directrices del Acuerdo 002 de 2014 del AGN y la Ley 594 de 2000
+                                aplicables a instituciones educativas en Colombia.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item glass">
+                        <button class="accordion-header">
+                            ¿Cómo funciona la búsqueda con IA?
+                            <span class="icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <p>Integramos tecnología de Gemini AI. Cuando subes un documento, la IA extrae
+                                automáticamente metadatos clave. Luego, puedes buscar expedientes escribiendo en
+                                lenguaje natural, por ejemplo: "Mostrar contrato de Juan Pérez de 2023", y el sistema
+                                encontrará exactamente lo que necesitas.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item glass">
+                        <button class="accordion-header">
+                            ¿Existen costos ocultos de implementación?
+                            <span class="icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <p>No. Nuestros planes Mensual y Anual Premium cubren el licenciamiento, almacenamiento
+                                indicado, y soporte. Los servicios adicionales como digitalización masiva de archivo
+                                físico se cotizan por separado según el volumen del colegio.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container footer-content">
+            <div class="footer-brand">
+                <a href="#hero" class="logo">
+                    <span class="logo-icon">📁</span>
+                    EduArchive<span class="text-acid">SGDEA</span>
+                </a>
+                <p>El sistema definitivo para la gestión documental de instituciones educativas en Colombia.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Enlaces</h4>
+                <ul>
+                    <li><a href="#caracteristicas">Características</a></li>
+                    <li><a href="#ventajas">Ventajas</a></li>
+                    <li><a href="#legal">Legal</a></li>
+                    <li><a href="#galeria">Galería</a></li>
+                    <li><a href="#planes">Planes</a></li>
+                </ul>
+            </div>
+            <div class="footer-contact">
+                <h4>Contacto</h4>
+                <p>ventas@eduarchive.com</p>
+                <p>1350 NW 55th St, Fort Lauderdale</p>
+                <p>770 NW 96th Ave, Doral, FL 33172.</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 EduArchive SGDEA. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>
