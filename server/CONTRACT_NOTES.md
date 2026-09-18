@@ -142,3 +142,109 @@ Motor reescrito según `docs/AI_ANALISIS.md` (migración `012_ai_engine.sql`, se
   pero `acta_s3_key` queda en `null`: no se simula el archivo.
 - `search_vector` usa `unaccent()` además de la configuración `spanish`, de modo que
   "robotica" encuentra "robótica".
+
+
+## 9. Corrección de la auditoría de calidad (18/09/2026)
+
+Cierre de los 13 defectos de `docs/QA_INFORME.md`. Lo que sigue **cambia respuestas o códigos
+de estado**: es lo que el equipo de interfaz necesita saber.
+
+### Cambios visibles para el cliente
+
+| Ruta | Antes | Ahora |
+|---|---|---|
+| `POST /documents/:id/lock` · `/unlock` | 200 (o 404 con la mutación ya hecha) para cualquier autenticado | **403 `FORBIDDEN`** sin escritura sobre el documento; 404 si no existe. La interfaz debe ocultar el botón salvo con escritura. |
+| `POST /documents/:id/transfer` | 200 con cualquier `to` admitido | **409 `CONFLICT`** si `to` no es el paso siguiente, o si el estado es `APROBADO`, `BLOQUEO_ADMIN`, `ARCHIVO_HISTORICO` o `CONSERVACION_PERMANENTE`. Lo más seguro es **no enviar `to`** y dejar que el servidor avance un paso. |
+| `GET /documents/:id/download` y `…/versions/:id/download` | firmaba la URL aunque el documento estuviera bloqueado | **409 `CONFLICT`** en `BLOQUEO_ADMIN`. |
+| `Document.retention_end_date` | `"Mon Sep 17"` (objeto `Date` recortado) | `"2125-09-18"`. **Todas** las columnas `date` (`birth_date`, `hire_date`, `fecha_apertura`, `expected_return_date`, `response_due_at`…) salen ahora como `YYYY-MM-DD` en vez de una marca de tiempo UTC: si el cliente hacía `new Date(x).toLocaleDateString()` ya no hay desplazamiento de un día. |
+| `POST /expedientes/:id/documents` | 201 con cualquier documento | **403 `FORBIDDEN`** si alguno de los `document_ids` no es legible para el usuario. |
+| `GET /people` (y `/people/:id/expedientes`) | listado completo para cualquier autenticado | filtrado; sin ninguna dependencia legible, 200 con `total: 0`. |
+| `GET /people/:id` | 200 para cualquier autenticado | **404** sin ninguna dependencia legible. |
+| `POST /people`, `PATCH /people/:id`, `POST /people/:id/events` | 201/200 para cualquier autenticado | **403** sin escritura en alguna dependencia (afecta a `AUDITOR` y `SIN_ASIGNAR`). |
+| `POST /documents/:id/notes` | 201 para cualquier lector | **403** sin escritura sobre el documento. |
+| `GET /stats/dashboard` → `recent_activity` | auditoría global para todos | global solo para acceso total y `AUDITOR`; el resto ve **solo sus propias acciones**. El panel de "actividad reciente" puede quedar vacío para un usuario nuevo. |
+| `PUT /trd/:id` con `module_code` | 200 | **403** si no hay permiso sobre el módulo de destino. |
+| `PUT /catalogs/*/:code` parcial | 400 `VALIDATION_ERROR` | **200**: el `PUT` actualiza solo los campos enviados. |
+| `PATCH /users/:id`, `POST /users/:id/deactivate` | 200/204 siempre | **409 `CONFLICT`** con mensaje explícito al autodegradarse, autodesactivarse, tocar la cuenta administradora fundacional o dejar el sistema sin acceso total. Conviene mostrar el mensaje tal cual. |
+| `POST /search/semantic` | 200 vacío cuando el usuario no tenía documentos | **503 `AI_NOT_CONFIGURED`** siempre que falte el motor de IA. |
+| `error.details` en errores de base de datos | incluía `detail` con la fila completa de PostgreSQL | solo `constraint` o `column`. |
+
+### Decisiones de implementación
+
+| Punto | Decisión |
+|---|---|
+| **Fechas civiles** | El parser de tipo `date` (OID 1082) de `node-postgres` se sustituye en `db/pool.ts` por la identidad: una columna `date` es una fecha civil, no un instante, y convertirla a `Date` en la zona del proceso desplazaba el día y rompía cualquier serialización. Arregla `retention_end_date` y todas las demás fechas de un golpe, incluidas las de los trabajos programados. |
+| **Secuencia archivística** | Vive en `document_statuses`. `catalogs.nextArchivalStatus()` devuelve el siguiente estado por `sort_order`; se transfiere solo desde estados con `allows_edit = true` y la disposición `KEEP` avanza al primer `is_terminal` posterior. No quedan listas de estados en el código de transferencia. |
+| **`BLOQUEO_ADMIN`** | Sigue siendo la única constante de estado en el servicio: la función de bloqueo se define en términos de ese estado (lo fija, lo levanta y ahora impide la descarga). Orden, editabilidad y terminalidad salen del catálogo. |
+| **Migración `013`** | `apply_trd_on_document()` calculaba `created_at::date` en la zona horaria de la sesión de PostgreSQL: la fecha de retención dependía de dónde corriera el servidor y de la hora del día. Ahora usa `(created_at AT TIME ZONE 'UTC')::date`, de modo que es una función pura del `created_at` que publica la API. **No se recalculan las filas existentes**: la migración de datos heredados puede traer sus propias `retention_end_date`. |
+| **`upsertCatalogRow`** | Intenta primero el `UPDATE` y solo inserta si no afectó a ninguna fila. PostgreSQL valida los `NOT NULL` de la fila candidata de un `INSERT … ON CONFLICT` **antes** de detectar el conflicto, así que la actualización parcial fallaba aunque la fila existiera. |
+| **Acceso transversal** | `access.hasAnyModuleAccess(user, permission)` y el middleware `requireAnyModuleAccess(permission)` cubren los recursos que no cuelgan de un módulo. El directorio de personas responde con lista vacía (como `GET /documents`) y con 404 en la ficha, para no distinguir "no existe" de "no puedes verlo". |
+| **Cuenta administradora fundacional** | Se deriva del dato, no de una constante: el usuario activo más antiguo con `roles.has_full_access`. Es la cuenta de último recurso, así que la API no la degrada ni la desactiva; para eso hay que entrar a la base de datos deliberadamente. |
+| **Auditoría en el tablero** | `audit.canViewAudit(user)` es ahora la única definición de quién lee la auditoría y la usan tanto `GET /audit` como `stats.dashboardStats()`. |
+
+### Hallazgos adicionales del mismo patrón (corregidos)
+
+1. `POST /documents/:id/relations` exigía escritura sobre el origen pero **no lectura sobre el
+   destino**, y `GET /documents/:id/relations` publica título, tipo, estado y módulo del
+   documento relacionado: era una fuga de metadatos de módulos vetados. Ahora responde 404 si
+   el destino no es legible.
+2. `GET /people/:id/expedientes` devolvía los expedientes de **todos** los módulos, incluida la
+   historia laboral en Talento Humano. Ahora se filtra por los módulos legibles.
+3. `GET /documents/:id/versions/:versionId/download` tenía el mismo hueco que la descarga
+   principal con los documentos bloqueados.
+
+Repaso del resto de servicios buscando el patrón de DEF-01 (leer el registro y escribir sin
+comprobar acceso): `categories`, `academicPeriods`, `help`, `system`, `access` y
+`document_permissions` están protegidos en la ruta con `requireFullAccess`; `loans`,
+`deletion`, `trash`, `notifications` y `me` comprueban el permiso en el servicio. No se
+encontraron más casos.
+
+
+## 10. Características por rol y gestión de contraseñas (18/09/2026)
+
+Implementación de `docs/PERMISOS_Y_USUARIOS.md`. Migración `014_features_passwords.sql`,
+semilla `009_features.sql`, servicio `services/features.ts`, middleware `requireFeature`.
+
+### Ambigüedades resueltas
+
+| Punto | Decisión |
+|---|---|
+| **Dónde se aplica `requireFeature`** | En **todas las rutas mutadoras** con el código del documento, y además en las rutas de solo lectura que ya estaban restringidas por otro motivo (`AUDIT_VIEW`, `AUDIT_EXPORT`, `CUSTODY_VIEW`, `AI_USAGE_VIEW`, `SYSTEM_CONFIG_VIEW`, `USER_VIEW`, `DOCUMENT_DOWNLOAD`). **No** se aplica a los listados abiertos (`GET /documents`, `/expedientes`, `/people`, `/trd`, `/trash`, `/loans`, `/stats/*`, `/search/*`): hoy responden 200 con la lista ya filtrada por módulo y convertirlos en 403 cambiaría el contrato vigente. Esas características (`DOCUMENT_VIEW`, `SEARCH_*`, `STATS_*`, `TRD_EXPORT`, `EXPEDIENTE_EXPORT`…) siguen publicándose en `effective_features` para que la interfaz oculte lo que el rol no usa. |
+| **`POST /search/semantic`** | No lleva `requireFeature`. Es una consulta, no una mutación, y el contrato exige **503 `AI_NOT_CONFIGURED`** para cualquier rol mientras falte el motor de IA, incluso sin documentos accesibles. Un 403 por característica rompería esa garantía. |
+| **Orden de los middlewares** | `requireFeature` se monta **después** de `requireModuleAccess` / `requireFullAccess` / `requireAnyModuleAccess` allí donde existían. Así, cuando el módulo ya negaba la acción, el motivo del rechazo sigue siendo el de antes (`403 FORBIDDEN`) y solo aparece `FEATURE_DISABLED` cuando el impedimento es realmente la característica. |
+| **`PUT /documents/:id/trd`** | Se protege con `DOCUMENT_EDIT`, no con `TRD_EDIT`: cambia el tipo documental **de un documento**, no la Tabla de Retención. `TRD_EDIT` queda para `POST/PUT/DELETE /trd`. |
+| **`POST /expedientes/:id/transfer`** | Reutiliza `DOCUMENT_TRANSFER`: el catálogo no define una característica propia para la transferencia de expedientes y es la misma acción archivística. |
+| **Valores por defecto de la matriz** | Viven en la tabla `role_feature_defaults`, sembrada por `009_features.sql`. Es lo que restaura `POST /features/matrix/reset` y lo que vuelve a aplicar la semilla. Hacía falta una tabla porque «restaurar la semilla» sin datos obligaría a escribir la matriz en el código, justo lo que el documento prohíbe. |
+| **Re-siembra sin pisar al administrador** | La semilla solo aplica el valor por defecto a las celdas con `role_features.updated_by IS NULL`. Cualquier cambio hecho desde el panel lleva `updated_by` y sobrevive a un `db:seed`. `reset` vuelve a poner `updated_by = NULL`. |
+| **Protección de las características núcleo** | Tres barreras: el trigger `protect_core_features` (la base rechaza el `UPDATE` con `CORE_FEATURE`), el servicio (409 `CORE_FEATURE` con mensaje legible) y `enabledFeaturesForRole`, que **siempre** considera habilitada una característica núcleo en un rol con `has_full_access`. Además, el trigger `enable_core_features_on_full_access` reenciende el núcleo cuando un rol pasa a tener acceso total. En el alta automática de la matriz (rol o característica nueva) la fila núcleo de un rol de acceso total **nace habilitada** en lugar de fallar. |
+| **Caché** | `services/features.ts` guarda el conjunto de códigos habilitados por rol con TTL de 5 s y lo invalida en cada escritura de la matriz, igual que la caché de `system_config`. Un cambio desde el panel surte efecto de inmediato. |
+| **`failed_attempts` y `locked_until` en `GET /users`** | **Conflicto entre documentos.** `docs/PERMISOS_Y_USUARIOS.md` §4 pide añadirlos al listado; la auditoría de calidad (`docs/QA_INFORME.md`) exige lo contrario: un listado masivo de usuarios no publica contadores de credencial. Se resolvió por lo más seguro: el **listado** publica `is_locked` (booleano), `password_status`, `password_expires_at`, `last_login_at` y `active_sessions` —todo lo que la pantalla necesita para pintar el estado y el botón de desbloquear— y el **detalle** `GET /users/:id` sí devuelve `failed_attempts` y `locked_until`. |
+| **Política de contraseñas: nombres heredados** | La política guardada admite los nombres antiguos (`require_uppercase`, `require_number`); `normalizePasswordPolicy()` los traduce a `require_upper` / `require_digit` y rellena las claves nuevas. La migración 014 completa la fila existente con `defaults || value`, de modo que lo que el administrador ya hubiera configurado gana. |
+| **Valores por defecto de la política** | `history_count = 0` y `expiry_days = null`, es decir **historial y caducidad apagados**, y `require_lower`/`require_symbol` en `false`. Es la única combinación que reproduce el comportamiento anterior: activarlos por defecto habría invalidado contraseñas ya en uso y roto flujos existentes (reinicio a una contraseña anterior, por ejemplo). `temporary_ttl_hours = 72`. |
+| **Caducidad** | Una contraseña vencida **no impide entrar**: `POST /auth/login` responde 200 y marca `must_change_password = true` (también en la base, para que `GET /auth/me` sea coherente). |
+| **Historial** | Se comparan la contraseña vigente y las `history_count` anteriores de `password_history`. La tabla se recorta a `history_count` filas en cada cambio: no se guarda más de lo que la política puede llegar a comparar. Todos los caminos de cambio pasan por `applyNewPassword()`. |
+| **Contraseña temporal** | `POST /users` y `POST /users/:id/reset-password` la generan con `generateStrongPassword(max(16, min_length))`, que siempre incluye mayúscula, minúscula, dígito y símbolo, y fijan `password_expires_at = now + temporary_ttl_hours`. |
+| **Salvaguarda de gobierno** | La del §9 (último administrador, cuenta fundacional, autodegradación) **sigue intacta**. La protección de las características núcleo se suma a ella. |
+
+## 11. Panel comercial (18/09/2026)
+
+Implementación de `docs/FACTURACION.md`. Migración `015_billing.sql`, semilla
+`010_billing.sql`, servicio `services/billing.ts`, rutas `routes/billing.ts`,
+PDF en `lib/pdfCommercial.ts`, trabajo `jobs/markOverdueInvoices.ts`.
+
+| Punto | Decisión |
+|---|---|
+| **Sin promesas normativas** | Ni el código, ni las respuestas, ni los PDF afirman validez ante la DIAN. El PDF de la factura se titula **«CUENTA DE COBRO»** y cierra con: *«Este documento NO es una factura electrónica ante la DIAN ni tiene efectos tributarios: es un documento comercial interno de registro y cobro.»* Ese texto no es configurable. `invoices.cufe` existe, es `TEXT NULL` y nunca se escribe. |
+| **Numeración** | `COT-AAAA-NNNN` al **crear** la cotización; `FAC-AAAA-NNNN` al **emitir** la factura. Una factura en borrador tiene `number = null`. Ambas usan `next_commercial_number(kind)` sobre `commercial_counters` con `UPDATE … RETURNING`, dentro de una transacción corta, como los folios. |
+| **Redondeo** | Explícito, a dos decimales y en SQL, en este orden: línea → subtotal → impuesto → total. `round(cantidad × precio, 2)`, `round(Σ líneas, 2)`, `round(subtotal × tasa / 100, 2)`, `total = subtotal + impuesto`. El servidor no suma dinero en JavaScript: solo lee el resultado. El parser `NUMERIC` de `db/pool.ts` los entrega como `number` en el JSON (compatible con lo que ya hacía el resto de la API). |
+| **Estados de la factura** | El disparador nunca adivina la fecha: `ISSUED`/`PARTIAL`/`PAID` salen de los pagos y `OVERDUE` lo fija el trabajo diario `mark_overdue_invoices`. `DRAFT` y `VOID` son inmunes al recálculo. |
+| **Pago mayor que el saldo** | Se rechaza con **409**. Un abono por encima del saldo es un anticipo, otra figura, y no se registra contra una factura concreta. Así `balance` nunca queda negativo. |
+| **Edición de una factura emitida** | Se admite mientras la factura no esté `PAID` ni `VOID` (regla 3 del documento, literal). Cambiar las líneas recalcula totales y saldo. |
+| **Revertir un pago** | `DELETE /payments/:id` **no borra**: marca `reversed_at`, `reversed_by` y `reversal_reason`, y el disparador devuelve el saldo. El motivo es obligatorio (400 si falta) y queda en auditoría. |
+| **Conversión de cotización** | Solo desde `ACCEPTED` y una sola vez (409 en otro caso). La factura nace en `DRAFT` con `quote_id` y las líneas copiadas tal cual, incluido el `plan_code`. |
+| **Renovación de licencias** | `POST /licenses/:id/renew` prorroga un periodo del plan desde el día siguiente a `end_date`, en fechas civiles UTC (nunca en la zona del proceso). Un plan `CUSTOM` responde 409: su vigencia se pacta y se envía con `PATCH`. |
+| **PDF** | Descarga directa (`application/pdf`), no URL prefirmada: el panel comercial no depende de que S3 esté configurado, a diferencia de las actas de eliminación. Misma librería (`pdfkit`) y mismo estilo que `lib/pdfActa.ts`. |
+| **`GET /billing/my-account`** | El cliente que representa a la institución se resuelve por `system_config.billing.my_client_id` y, si no está puesto, por coincidencia de `name`/`legal_name` con `system_config.institution_name`. Si no hay ninguno, **404 con mensaje explícito**: no se adivina. |
+| **Montaje de rutas** | Recursos propios en `/api/clients`, `/api/license-plans`, `/api/licenses`, `/api/quotes`, `/api/invoices`, `/api/payments`, y el resumen en `/api/billing/stats` y `/api/billing/my-account`. `GET /licenses/expiring` se define **antes** de `/licenses/:id` para que no colisionen. |
+| **Planes del sitio público** | Los tres viven en `license_plans` y solo ahí. Las cifras (1.700.000 COP/mes, 10.000.000 COP/año, precio a la medida) siguen **pendientes de confirmación del cliente**, como se anotó al reconstruir la página pública. |
+| **Trabajo nuevo** | `mark_overdue_invoices` se suma a `JOB_HANDLERS` y a `system_config.jobs` (`40 0 * * *`). La semilla 010 lo añade a las instalaciones existentes sin pisar los demás horarios. |

@@ -6,6 +6,7 @@ import { ApiError } from '@/api/client';
 import { useQuery } from '@/hooks/useQuery';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Button } from '@/components/ui/Button';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
@@ -40,7 +41,11 @@ export function NotesTab({ documentId, canWrite }: NotesTabProps): React.JSX.Ele
 
   return (
     <div className="space-y-4">
+      {/* Crear notas exige escritura sobre el documento: el servidor responde
+          403 FORBIDDEN sin ella (CONTRACT_NOTES §9), y el mensaje del rechazo
+          se muestra tal cual en el aviso. */}
       {canWrite && (
+        <IfFeature code="DOCUMENT_NOTE_ADD">
         <div className="rounded-card border border-line bg-surface-sunken p-3">
           <Textarea
             rows={3}
@@ -61,6 +66,7 @@ export function NotesTab({ documentId, canWrite }: NotesTabProps): React.JSX.Ele
             Añadir nota
           </Button>
         </div>
+        </IfFeature>
       )}
 
       {notes.loading ? (

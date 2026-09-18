@@ -5,12 +5,13 @@ import { logger } from '../lib/logger.js';
 import { notifyDocumentUpdated } from '../lib/sse.js';
 import { resolvePagination, resolveSort, type Paginated } from '../lib/pagination.js';
 import {
+  canReadDocument,
   canWriteDocument,
   documentAccessClause,
   readableModuleCodes,
   type AuthUser,
 } from './access.js';
-import { getDocumentStatus, requireModule } from './catalogs.js';
+import { getDocumentStatus, nextArchivalStatus, requireModule } from './catalogs.js';
 import { logCustody } from './custody.js';
 import { extractText, supportsOcr } from './extraction.js';
 import { fullAccessUserIds, notifyMany } from './notifications.js';
@@ -39,8 +40,25 @@ export const STATUS_PERMANENTE = 'CONSERVACION_PERMANENTE';
 export const STATUS_BLOQUEO = 'BLOQUEO_ADMIN';
 export const STATUS_APROBADO = 'APROBADO';
 
-/** Estados que impiden editar o eliminar (contrato §Semántica de acceso, regla 6). */
-const PROTECTED_STATUSES = new Set([STATUS_PERMANENTE, STATUS_APROBADO, STATUS_BLOQUEO]);
+/**
+ * Estados que impiden enviar a la papelera (contrato §Semántica de acceso, regla 6).
+ * Se deriva del catálogo `document_statuses`: los estados terminales más el
+ * bloqueo administrativo, que es el estado propio de la función de bloqueo.
+ */
+async function isTrashProtected(code: string): Promise<boolean> {
+  if (code === STATUS_BLOQUEO) return true;
+  const status = await getDocumentStatus(code);
+  return status?.is_terminal === true;
+}
+
+/** Un bloqueo administrativo impide que el documento salga del sistema. */
+function assertDownloadable(statusCode: string): void {
+  if (statusCode === STATUS_BLOQUEO) {
+    throw ApiError.conflict(
+      'El documento está bloqueado administrativamente y no se puede descargar mientras siga bloqueado.',
+    );
+  }
+}
 
 const DOC_COLUMNS = `
   d.id, d.title, d.type, d.module_code, d.folio_index, d.s3_key, d.s3_bucket,
@@ -119,6 +137,22 @@ function toIsoDate(value: unknown): string | null {
   return String(value);
 }
 
+/**
+ * Fecha civil (columna `date`) en ISO `YYYY-MM-DD`.
+ * El pool ya devuelve las columnas `date` como texto ISO (`db/pool.ts`); el caso
+ * `Date` queda como red de seguridad y nunca aplica desplazamiento de zona horaria.
+ */
+function toIsoDateOnly(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    const year = value.getUTCFullYear();
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 export function mapDocument(row: DocumentRow): DocumentDto {
   return {
     id: row.id as string,
@@ -151,7 +185,7 @@ export function mapDocument(row: DocumentRow): DocumentDto {
     subcategory: (row.subcategory as string | null) ?? null,
     person_id: (row.person_id as string | null) ?? null,
     academic_period_id: (row.academic_period_id as string | null) ?? null,
-    retention_end_date: row.retention_end_date ? String(row.retention_end_date).slice(0, 10) : null,
+    retention_end_date: toIsoDateOnly(row.retention_end_date),
     approved_by: (row.approved_by as string | null) ?? null,
     approved_at: toIsoDate(row.approved_at),
     approval_sha256: (row.approval_sha256 as string | null) ?? null,
@@ -515,8 +549,9 @@ export async function assignFolio(user: AuthUser, id: string, manualFolio?: stri
 }
 
 export async function setLock(user: AuthUser, id: string, lock: boolean): Promise<DocumentDto> {
-  const doc = await fetchDocumentRaw(id);
-  if (!doc) throw ApiError.notFound('El documento no existe.');
+  // Bloquear y desbloquear son mutaciones: exigen permiso de escritura sobre el
+  // documento, igual que el resto de acciones mutadoras (DEF-01).
+  const doc = await requireWritableDocument(user, id);
 
   if (lock) {
     if (doc.status_code === STATUS_BLOQUEO) throw ApiError.conflict('El documento ya está bloqueado.');
@@ -594,24 +629,47 @@ export async function transferDocument(
   const doc = await requireWritableDocument(user, id);
   const current = doc.status_code as string;
 
-  const nextByStatus: Record<string, string> = {
-    [STATUS_GESTION]: STATUS_CENTRAL,
-    [STATUS_CENTRAL]: STATUS_HISTORICO,
-  };
-  const next = target ?? nextByStatus[current];
-  if (!next || (target && ![STATUS_CENTRAL, STATUS_HISTORICO].includes(target))) {
-    throw ApiError.conflict('El documento ya está en archivo histórico o su estado no permite transferencia.');
+  // La secuencia archivística sale del catálogo `document_statuses`
+  // (`allows_edit`, `is_terminal`, `sort_order`), no de constantes en el código.
+  const currentStatus = await getDocumentStatus(current);
+  if (!currentStatus) {
+    throw ApiError.conflict('El estado actual del documento no existe en el catálogo de estados.');
+  }
+  // Solo se transfiere desde un estado que admite modificaciones: los estados
+  // protegidos (aprobado, bloqueo administrativo, conservación permanente) y el
+  // archivo histórico —final de la secuencia— no se transfieren, porque hacerlo
+  // les quitaría la protección de edición y anularía el sello de aprobación (DEF-02).
+  if (!currentStatus.allows_edit) {
+    throw ApiError.conflict(
+      `El documento está en estado "${currentStatus.name}" y no admite transferencia archivística.`,
+    );
   }
 
-  let finalStatus = next;
-  if (next === STATUS_HISTORICO) {
+  const nextStatus = await nextArchivalStatus(current);
+  if (!nextStatus) {
+    throw ApiError.conflict('El documento ya está en el último estado de la secuencia archivística.');
+  }
+  // No se pueden saltar etapas: el único destino válido es el paso siguiente.
+  if (target && target !== nextStatus.code) {
+    throw ApiError.conflict(
+      `La secuencia archivística es obligatoria: desde "${currentStatus.name}" el único destino válido es "${nextStatus.name}".`,
+    );
+  }
+
+  let finalStatus = nextStatus.code;
+  // Al salir de la fase editable se aplica la disposición final de la TRD: si es
+  // de conservación, el documento avanza un paso más, hasta el estado terminal.
+  if (!nextStatus.allows_edit) {
     const rule = await one<{ action: string }>(
       `SELECT dp.action
          FROM retention_rules rr JOIN dispositions dp ON dp.code = rr.disposition_code
         WHERE rr.module_code = $1 AND rr.document_type = $2`,
       [doc.module_code, doc.type],
     );
-    if (rule?.action === 'KEEP') finalStatus = STATUS_PERMANENTE;
+    if (rule?.action === 'KEEP') {
+      const keepStatus = await nextArchivalStatus(nextStatus.code);
+      if (keepStatus?.is_terminal) finalStatus = keepStatus.code;
+    }
   }
 
   await query('UPDATE documents SET status_code = $2 WHERE id = $1', [id, finalStatus]);
@@ -647,7 +705,7 @@ export async function transferDocument(
 export async function trashDocument(user: AuthUser, id: string, reason: string): Promise<void> {
   const doc = await requireWritableDocument(user, id);
   if (doc.deleted_at) throw ApiError.conflict('El documento ya está en la papelera.');
-  if (PROTECTED_STATUSES.has(doc.status_code as string)) {
+  if (await isTrashProtected(doc.status_code as string)) {
     throw ApiError.conflict('Los documentos aprobados, bloqueados o en conservación permanente no se pueden eliminar.');
   }
 
@@ -683,6 +741,7 @@ export async function downloadDocument(
   disposition: 'inline' | 'attachment',
 ): Promise<{ url: string; expires_at: string }> {
   const doc = await getDocumentForUser(user, id, { includeDeleted: true });
+  assertDownloadable(doc.status_code);
   const signed = await presignDownload(doc.s3_key, doc.file_name, disposition);
   await logCustody(
     { id: doc.id, title: doc.title, module_code: doc.module_code, s3_key: doc.s3_key },
@@ -785,6 +844,9 @@ export async function listNotes(id: string) {
 }
 
 export async function addNote(user: AuthUser, id: string, text: string) {
+  // Anotar es escribir en el expediente del documento: exige permiso de
+  // escritura, igual que etiquetas y metadatos (DEF-08).
+  await requireWritableDocument(user, id);
   const note = await one<{ id: string }>(
     'INSERT INTO document_notes (document_id, author_id, text) VALUES ($1,$2,$3) RETURNING id',
     [id, user.id, text],
@@ -908,6 +970,7 @@ export async function downloadVersion(
   versionId: string,
 ): Promise<{ url: string; expires_at: string }> {
   const doc = await getDocumentForUser(user, id);
+  assertDownloadable(doc.status_code);
   const version = await one<{ s3_key: string; file_name: string }>(
     'SELECT s3_key, file_name FROM document_versions WHERE id = $1 AND document_id = $2',
     [versionId, id],
@@ -948,6 +1011,11 @@ export async function addRelation(
 ) {
   await requireWritableDocument(user, id);
   if (id === targetId) throw ApiError.badRequest('Un documento no puede relacionarse consigo mismo.');
+  // La relación expone título, tipo, estado y módulo del documento destino:
+  // exige al menos poder leerlo.
+  if (!(await canReadDocument(user, targetId))) {
+    throw ApiError.notFound('El documento destino no existe o no tienes acceso a él.');
+  }
   await query(
     `INSERT INTO document_relations (source_document_id, target_document_id, relation_type, created_by)
      VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
@@ -1029,7 +1097,8 @@ export async function setDocumentTrd(user: AuthUser, id: string, documentType: s
   await query(
     `UPDATE documents
         SET type = $2,
-            retention_end_date = (created_at::date + ($3 || ' years')::interval)::date
+            retention_end_date =
+              ((created_at AT TIME ZONE 'UTC')::date + ($3 || ' years')::interval)::date
       WHERE id = $1`,
     [id, documentType, rule.retention_years],
   );

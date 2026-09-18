@@ -11,6 +11,7 @@ import { invalidatePrefix, useQuery } from '@/hooks/useQuery';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { HelpButton } from '@/components/help/HelpButton';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { Button } from '@/components/ui/Button';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -122,6 +123,7 @@ export default function ModuleViewPage(): React.JSX.Element {
               label={`Ayuda de ${moduleLabel(code)}`}
             />
             {writable && (
+              <IfFeature code="DOCUMENT_UPLOAD">
               <Button
                 variant="primary"
                 onClick={() => setWizardOpen(true)}
@@ -129,6 +131,7 @@ export default function ModuleViewPage(): React.JSX.Element {
               >
                 Cargar documentos
               </Button>
+              </IfFeature>
             )}
           </>
         }

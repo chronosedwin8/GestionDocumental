@@ -9,6 +9,7 @@ import { useAiHealth } from '@/hooks/useAiHealth';
 import { invalidatePrefix } from '@/hooks/useQuery';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Badge } from '@/components/ui/Badge';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
@@ -236,16 +237,18 @@ export function AiTab(): React.JSX.Element {
           </FormField>
         </div>
 
-        <Button
-          className="mt-3"
-          variant="primary"
-          loading={queuing}
-          disabled={!configured}
-          onClick={() => void reprocess()}
-          icon={<RefreshCw className="h-4 w-4" />}
-        >
-          Reprocesar
-        </Button>
+        <IfFeature code="AI_REPROCESS">
+          <Button
+            className="mt-3"
+            variant="primary"
+            loading={queuing}
+            disabled={!configured}
+            onClick={() => void reprocess()}
+            icon={<RefreshCw className="h-4 w-4" />}
+          >
+            Reprocesar
+          </Button>
+        </IfFeature>
 
         {!configured && (
           <p className="mt-2 text-xs text-content-muted">

@@ -2,12 +2,14 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { ApiError } from '../lib/errors.js';
 import { currentUser, requireAuth } from '../middleware/auth.js';
+import { requireFeature } from '../middleware/authorize.js';
 import { validateQuery } from '../middleware/validate.js';
 import { buildExport, type ExportFormat } from '../lib/exporters.js';
 import {
   listAuditActions,
   listAuditLogs,
   listAuditLogsForExport,
+  canViewAudit,
   type AuditFilters,
 } from '../services/audit.js';
 import { listCustody } from '../services/custody.js';
@@ -20,7 +22,7 @@ custodyRouter.use(requireAuth);
 
 function requireAuditor(req: Request): void {
   const user = currentUser(req);
-  if (user.role.has_full_access || user.role_code === 'AUDITOR') return;
+  if (canViewAudit(user)) return;
   throw ApiError.forbidden('Solo administración, rectoría o auditoría pueden consultar la auditoría.');
 }
 
@@ -34,18 +36,19 @@ const auditQuery = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
 
-auditRouter.get('/', validateQuery(auditQuery), async (req: Request, res: Response) => {
+auditRouter.get('/', requireFeature('AUDIT_VIEW'), validateQuery(auditQuery), async (req: Request, res: Response) => {
   requireAuditor(req);
   res.json(await listAuditLogs(req.query as z.infer<typeof auditQuery>));
 });
 
-auditRouter.get('/actions', async (req: Request, res: Response) => {
+auditRouter.get('/actions', requireFeature('AUDIT_VIEW'), async (req: Request, res: Response) => {
   requireAuditor(req);
   res.json(await listAuditActions());
 });
 
 auditRouter.get(
   '/export',
+  requireFeature('AUDIT_EXPORT'),
   validateQuery(auditQuery.extend({ format: z.enum(['csv', 'xlsx']).default('csv') })),
   async (req: Request, res: Response) => {
     requireAuditor(req);
@@ -73,6 +76,7 @@ auditRouter.get(
 
 custodyRouter.get(
   '/',
+  requireFeature('CUSTODY_VIEW'),
   validateQuery(
     z.object({
       document_id: z.string().uuid().optional(),

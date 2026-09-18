@@ -7,6 +7,12 @@ const { Pool } = pg;
 pg.types.setTypeParser(20, (value: string) => Number(value));
 // NUMERIC
 pg.types.setTypeParser(1700, (value: string) => Number(value));
+// DATE (sin hora): `node-postgres` lo convierte por defecto a un objeto `Date`
+// en la zona horaria del proceso, lo que desplaza el día y rompe cualquier
+// serialización posterior (`String(fecha)` → "Mon Sep 17 2125 …"). Una columna
+// `date` es una fecha civil, no un instante: se conserva tal cual la envía
+// PostgreSQL, en ISO `YYYY-MM-DD`.
+pg.types.setTypeParser(1082, (value: string) => value);
 
 export const pool = new Pool({
   connectionString: env.databaseUrl,

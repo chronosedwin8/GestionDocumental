@@ -14,11 +14,21 @@ import { academicPeriodsRouter } from './routes/academicPeriods.js';
 import { aiRouter } from './routes/ai.js';
 import { auditRouter, custodyRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
+import {
+  billingRouter,
+  clientsRouter,
+  invoicesRouter,
+  licensePlansRouter,
+  licensesRouter,
+  paymentsRouter,
+  quotesRouter,
+} from './routes/billing.js';
 import { catalogsRouter } from './routes/catalogs.js';
 import { categoriesRouter } from './routes/categories.js';
 import { deletionLogsRouter, deletionRequestsRouter } from './routes/deletion.js';
 import { documentsRouter } from './routes/documents.js';
 import { expedientesRouter } from './routes/expedientes.js';
+import { featuresRouter } from './routes/features.js';
 import { helpRouter } from './routes/help.js';
 import { loansRouter } from './routes/loans.js';
 import { meRouter } from './routes/me.js';
@@ -87,6 +97,7 @@ export function createApp(): Express {
   api.use('/catalogs', catalogsRouter);
   api.use('/users', usersRouter);
   api.use('/access', accessRouter);
+  api.use('/features', featuresRouter);
   api.use('/documents', documentsRouter);
   api.use('/search', searchRouter);
   api.use('/expedientes', expedientesRouter);
@@ -106,6 +117,15 @@ export function createApp(): Express {
   api.use('/help', helpRouter);
   api.use('/me', meRouter);
   api.use('/ai', aiRouter);
+
+  // Panel comercial (docs/FACTURACION.md). No es facturación electrónica DIAN.
+  api.use('/clients', clientsRouter);
+  api.use('/license-plans', licensePlansRouter);
+  api.use('/licenses', licensesRouter);
+  api.use('/quotes', quotesRouter);
+  api.use('/invoices', invoicesRouter);
+  api.use('/payments', paymentsRouter);
+  api.use('/billing', billingRouter);
 
   app.use('/api', api);
 

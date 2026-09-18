@@ -16,6 +16,15 @@ export type AuditLogRow = {
   created_at: string;
 };
 
+/**
+ * Quién puede leer la auditoría global: acceso total o el rol de auditoría.
+ * Es la misma condición que aplica `GET /audit`; cualquier otra ruta que
+ * devuelva registros de auditoría debe usarla (DEF-07).
+ */
+export function canViewAudit(user: AuthUser): boolean {
+  return user.role.has_full_access || user.role_code === 'AUDITOR';
+}
+
 export function clientIp(req: Request): string | null {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded.length > 0) return forwarded.split(',')[0].trim();

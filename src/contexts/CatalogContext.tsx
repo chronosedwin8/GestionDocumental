@@ -14,12 +14,15 @@ import {
   type ReactNode,
 } from 'react';
 import { getCatalogs } from '@/api/catalogs';
+import { getFeatureCatalog } from '@/api/features';
 import { ApiError } from '@/api/client';
 import type {
   Catalogs,
   CorrespondenceType,
   Disposition,
   DocumentStatus,
+  Feature,
+  FeatureCategory,
   Module,
   NotificationType,
   PersonType,
@@ -45,6 +48,9 @@ export interface CatalogContextValue {
   correspondenceTypes: CorrespondenceType[];
   personTypes: PersonType[];
   settings: PublicSettings | null;
+  /** Catálogo de características por rol (`docs/PERMISOS_Y_USUARIOS.md §4`). */
+  features: Feature[];
+  featureCategories: FeatureCategory[];
 
   module: (code: string | null | undefined) => Module | undefined;
   moduleLabel: (code: string | null | undefined) => string;
@@ -62,6 +68,18 @@ export interface CatalogContextValue {
   notificationType: (code: string | null | undefined) => NotificationType | undefined;
   correspondenceType: (code: string | null | undefined) => CorrespondenceType | undefined;
   personTypeLabel: (code: string | null | undefined) => string;
+  feature: (code: string | null | undefined) => Feature | undefined;
+  featureLabel: (code: string | null | undefined) => string;
+  featureCategory: (code: string | null | undefined) => FeatureCategory | undefined;
+  featureCategoryLabel: (code: string | null | undefined) => string;
+  /** Características de una categoría, ordenadas por `sort_order`. */
+  featuresOfCategory: (categoryCode: string) => Feature[];
+  /**
+   * Siguiente estado de la secuencia archivística según `sort_order`, igual
+   * que `catalogs.nextArchivalStatus()` del servidor. Sirve para **mostrar**
+   * el destino de una transferencia, nunca para imponerlo: el servidor decide.
+   */
+  nextArchivalStatus: (code: string | null | undefined) => DocumentStatus | undefined;
 }
 
 const CatalogContext = createContext<CatalogContextValue | undefined>(undefined);
@@ -104,8 +122,26 @@ export function CatalogProvider({
     setError(null);
     try {
       const data = await getCatalogs(signal);
-      setCatalogs(data);
-      writeCache(data);
+      // `GET /catalogs` debe traer `features` y `feature_categories`
+      // (PERMISOS §4). Mientras el servidor no los publique se piden a
+      // `GET /features`, que cualquier autenticado puede leer. Si tampoco
+      // existe, la interfaz se queda sin catálogo de características y
+      // `useFeature` no oculta nada por su cuenta.
+      let merged = data;
+      if (!data.features || !data.feature_categories) {
+        try {
+          const catalog = await getFeatureCatalog(signal);
+          merged = {
+            ...data,
+            features: data.features ?? catalog.features,
+            feature_categories: data.feature_categories ?? catalog.categories,
+          };
+        } catch (featureError) {
+          if (featureError instanceof DOMException && featureError.name === 'AbortError') return;
+        }
+      }
+      setCatalogs(merged);
+      writeCache(merged);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(
@@ -138,6 +174,10 @@ export function CatalogProvider({
     const notificationTypes = catalogs?.notification_types ?? [];
     const correspondenceTypes = catalogs?.correspondence_types ?? [];
     const personTypes = catalogs?.person_types ?? [];
+    const features = [...(catalogs?.features ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+    const featureCategories = [...(catalogs?.feature_categories ?? [])].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
 
     const moduleMap = new Map(modules.map((m) => [m.code, m]));
     const roleMap = new Map(roles.map((r) => [r.code, r]));
@@ -146,6 +186,9 @@ export function CatalogProvider({
     const notificationMap = new Map(notificationTypes.map((n) => [n.code, n]));
     const correspondenceMap = new Map(correspondenceTypes.map((c) => [c.code, c]));
     const personTypeMap = new Map(personTypes.map((p) => [p.code, p]));
+    const featureMap = new Map(features.map((f) => [f.code, f]));
+    const featureCategoryMap = new Map(featureCategories.map((c) => [c.code, c]));
+    const sortedStatuses = [...statuses].sort((a, b) => a.sort_order - b.sort_order);
 
     const get = <T,>(map: Map<string, T>, code: string | null | undefined): T | undefined =>
       code ? map.get(code) : undefined;
@@ -158,12 +201,14 @@ export function CatalogProvider({
       modules,
       activeModules: modules.filter((m) => m.is_active).sort((a, b) => a.sort_order - b.sort_order),
       roles,
-      statuses: [...statuses].sort((a, b) => a.sort_order - b.sort_order),
+      statuses: sortedStatuses,
       dispositions,
       notificationTypes,
       correspondenceTypes,
       personTypes,
       settings: catalogs?.settings ?? null,
+      features,
+      featureCategories,
 
       module: (code) => get(moduleMap, code),
       moduleLabel: (code) => get(moduleMap, code)?.name ?? code ?? '—',
@@ -181,6 +226,18 @@ export function CatalogProvider({
       notificationType: (code) => get(notificationMap, code),
       correspondenceType: (code) => get(correspondenceMap, code),
       personTypeLabel: (code) => get(personTypeMap, code)?.name ?? code ?? '—',
+      feature: (code) => get(featureMap, code),
+      featureLabel: (code) => get(featureMap, code)?.name ?? code ?? '—',
+      featureCategory: (code) => get(featureCategoryMap, code),
+      featureCategoryLabel: (code) => get(featureCategoryMap, code)?.name ?? code ?? '—',
+      featuresOfCategory: (categoryCode) =>
+        features.filter((entry) => entry.category_code === categoryCode),
+      nextArchivalStatus: (code) => {
+        if (!code) return undefined;
+        const index = sortedStatuses.findIndex((entry) => entry.code === code);
+        if (index === -1) return undefined;
+        return sortedStatuses[index + 1];
+      },
     };
   }, [catalogs, loading, error, reload]);
 

@@ -7,6 +7,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { usePagination } from '@/hooks/usePagination';
 import { useQuery } from '@/hooks/useQuery';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
@@ -145,9 +146,11 @@ export function AuditTab(): React.JSX.Element {
             pagination.setPage(1);
           }}
         />
-        <Button variant="outline" size="sm" onClick={() => void exportAudit()} icon={<Download className="h-3.5 w-3.5" />}>
-          Exportar
-        </Button>
+        <IfFeature code="AUDIT_EXPORT">
+          <Button variant="outline" size="sm" onClick={() => void exportAudit()} icon={<Download className="h-3.5 w-3.5" />}>
+            Exportar
+          </Button>
+        </IfFeature>
       </Toolbar>
 
       {logs.error ? (

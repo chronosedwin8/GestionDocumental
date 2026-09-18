@@ -8,7 +8,7 @@ import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { toDateInput } from '@/lib/format';
+import { todayInput } from '@/lib/format';
 import type { ApiDocument, PersonEvent } from '@/types/api';
 
 export interface PersonEventFormProps {
@@ -35,7 +35,7 @@ export function PersonEventForm({
   const [eventType, setEventType] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventDate, setEventDate] = useState(() => toDateInput(new Date().toISOString()));
+  const [eventDate, setEventDate] = useState(() => todayInput());
   const [documentId, setDocumentId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

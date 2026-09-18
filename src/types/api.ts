@@ -126,6 +126,52 @@ export interface PublicSettings {
   ai_confidence_threshold?: number;
 }
 
+/* ------------------------------------------- características por rol (§4) */
+
+export interface FeatureCategory {
+  code: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+}
+
+export interface Feature {
+  code: string;
+  name: string;
+  description: string | null;
+  category_code: string;
+  /** No se puede desactivar en roles con `has_full_access`. */
+  is_core: boolean;
+  /** Se resalta en la matriz. */
+  is_sensitive: boolean;
+  sort_order: number;
+}
+
+export interface RoleFeature {
+  role_code: string;
+  feature_code: string;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export interface FeatureCatalog {
+  categories: FeatureCategory[];
+  features: Feature[];
+}
+
+export interface PasswordPolicy {
+  min_length: number;
+  require_upper: boolean;
+  require_lower: boolean;
+  require_digit: boolean;
+  require_symbol: boolean;
+  max_attempts: number;
+  lockout_minutes: number;
+  expiry_days: number | null;
+  history_count: number;
+  temporary_ttl_hours: number;
+}
+
 export interface Catalogs {
   modules: Module[];
   roles: Role[];
@@ -135,6 +181,12 @@ export interface Catalogs {
   correspondence_types: CorrespondenceType[];
   person_types: PersonType[];
   settings: PublicSettings;
+  /**
+   * Añadidos por `docs/PERMISOS_Y_USUARIOS.md §4`. Opcionales mientras el
+   * servidor no los publique: la interfaz cae a `GET /features`.
+   */
+  features?: Feature[];
+  feature_categories?: FeatureCategory[];
 }
 
 /* --------------------------------------------------------------- usuarios */
@@ -153,6 +205,15 @@ export interface User {
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
+  /* Añadidos por docs/PERMISOS_Y_USUARIOS.md §4. Se declaran opcionales para
+     tolerar un servidor anterior a ese cambio: la interfaz no inventa valores. */
+  phone?: string | null;
+  position?: string | null;
+  failed_attempts?: number;
+  locked_until?: string | null;
+  password_changed_at?: string | null;
+  password_expires_at?: string | null;
+  active_sessions?: number;
 }
 
 export interface EffectiveModule {
@@ -163,6 +224,12 @@ export interface EffectiveModule {
 
 export interface Me extends User {
   effective_modules: EffectiveModule[];
+  /**
+   * Características habilitadas para el rol del usuario (`GET /auth/me`).
+   * Opcional: si el servidor todavía no la publica, la interfaz no oculta
+   * nada por su cuenta (ver `useFeature`).
+   */
+  effective_features?: string[];
   role: Role;
 }
 
@@ -880,4 +947,203 @@ export interface AiReprocessResult {
 export interface DocumentUpdatedEvent {
   id: string;
   module_code: string;
+}
+
+/* --------------------------------------------- comercial (FACTURACION.md) */
+
+export type ClientStatus = 'PROSPECT' | 'ACTIVE' | 'SUSPENDED' | 'FORMER';
+
+export interface Client {
+  id: string;
+  name: string;
+  legal_name: string | null;
+  document_type: string | null;
+  document_number: string | null;
+  tax_regime: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  status: ClientStatus;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BillingPeriod = 'MONTHLY' | 'ANNUAL' | 'CUSTOM';
+
+export interface LicensePlan {
+  code: string;
+  name: string;
+  description: string | null;
+  billing_period: BillingPeriod;
+  /** `null` = precio a la medida; no se inventa ninguna cifra. */
+  price_amount: string | number | null;
+  currency: string;
+  storage_gb: number | null;
+  max_users: number | null;
+  features: unknown;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type LicenseStatus = 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED';
+
+export interface License {
+  id: string;
+  client_id: string;
+  client_name?: string | null;
+  plan_code: string;
+  plan_name?: string | null;
+  start_date: string;
+  end_date: string | null;
+  status: LicenseStatus;
+  seats: number | null;
+  storage_gb: number | null;
+  price_amount: string | number | null;
+  currency: string;
+  auto_renew: boolean;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommercialItem {
+  id: string;
+  position: number;
+  description: string;
+  plan_code: string | null;
+  quantity: string | number;
+  unit_price: string | number;
+  total: string | number;
+}
+
+/** Línea tal como se envía al crear o editar (sin `id` ni totales calculados). */
+export interface CommercialItemInput {
+  description: string;
+  plan_code?: string | null;
+  quantity: number;
+  unit_price: number;
+  position?: number;
+}
+
+export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+
+export interface Quote {
+  id: string;
+  client_id: string;
+  client_name?: string | null;
+  number: string | null;
+  issue_date: string;
+  valid_until: string | null;
+  status: QuoteStatus;
+  currency: string;
+  subtotal: string | number;
+  tax_rate: string | number;
+  tax_amount: string | number;
+  total: string | number;
+  notes: string | null;
+  terms: string | null;
+  created_by: string | null;
+  sent_at: string | null;
+  decided_at: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: CommercialItem[];
+}
+
+export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'VOID';
+
+export interface Invoice {
+  id: string;
+  client_id: string;
+  client_name?: string | null;
+  quote_id: string | null;
+  license_id: string | null;
+  number: string | null;
+  issue_date: string;
+  due_date: string | null;
+  status: InvoiceStatus;
+  currency: string;
+  subtotal: string | number;
+  tax_rate: string | number;
+  tax_amount: string | number;
+  total: string | number;
+  /** Calculados por el servidor: nunca se recalculan en el cliente. */
+  paid_amount: string | number;
+  balance: string | number;
+  cufe: string | null;
+  notes: string | null;
+  created_by: string | null;
+  issued_at: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: CommercialItem[];
+}
+
+export type PaymentMethod = 'TRANSFER' | 'PSE' | 'CASH' | 'CHECK' | 'CARD' | 'OTHER';
+
+export interface Payment {
+  id: string;
+  invoice_id: string;
+  invoice_number?: string | null;
+  client_id: string;
+  client_name?: string | null;
+  payment_date: string;
+  amount: string | number;
+  currency: string;
+  method: PaymentMethod;
+  reference: string | null;
+  notes: string | null;
+  registered_by: string | null;
+  created_at: string;
+}
+
+export interface ClientSummary {
+  client: Client;
+  active_license: License | null;
+  licenses: License[];
+  totals: {
+    invoiced: string | number;
+    paid: string | number;
+    balance: string | number;
+    overdue: string | number;
+  };
+  last_quotes: Quote[];
+  last_invoices: Invoice[];
+  last_payments: Payment[];
+}
+
+export interface BillingStats {
+  invoiced_by_month: { month: string; total: string | number }[];
+  collected_by_month: { month: string; total: string | number }[];
+  outstanding: string | number;
+  overdue: string | number;
+  by_plan: { plan_code: string; plan_name?: string | null; total: string | number }[];
+  top_clients: { client_id: string; client_name: string; total: string | number }[];
+}
+
+export interface MyAccount {
+  client: Client | null;
+  active_license: License | null;
+  licenses?: License[];
+  invoices: Invoice[];
+  payments: Payment[];
+}
+
+/** Configuración comercial publicada por el servidor (`system_config.billing`). */
+export interface BillingSettings {
+  tax_rate: number;
+  currency: string;
+  payment_terms_days: number;
+  quote_validity_days: number;
+  issuer_name?: string | null;
+  issuer_document?: string | null;
 }

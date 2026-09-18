@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import {
@@ -36,6 +36,7 @@ deletionRequestsRouter.get(
 
 deletionRequestsRouter.post(
   '/',
+  requireFeature('DELETION_REQUEST_CREATE'),
   validateBody(z.object({ document_id: z.string().uuid(), reason: z.string().min(5) })),
   async (req: Request, res: Response) => {
     const body = req.body as { document_id: string; reason: string };
@@ -48,6 +49,7 @@ deletionRequestsRouter.post(
 deletionRequestsRouter.post(
   '/:id/approve',
   requireFullAccess,
+  requireFeature('DELETION_REQUEST_REVIEW'),
   validateBody(z.object({ notes: z.string().optional() })),
   async (req: Request, res: Response) => {
     const body = req.body as { notes?: string };
@@ -60,6 +62,7 @@ deletionRequestsRouter.post(
 deletionRequestsRouter.post(
   '/:id/reject',
   requireFullAccess,
+  requireFeature('DELETION_REQUEST_REVIEW'),
   validateBody(z.object({ notes: z.string().min(3) })),
   async (req: Request, res: Response) => {
     const body = req.body as { notes: string };

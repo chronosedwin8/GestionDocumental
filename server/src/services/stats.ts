@@ -1,5 +1,6 @@
 import { many, one } from '../db/pool.js';
 import { readableModuleCodes, type AuthUser } from './access.js';
+import { canViewAudit } from './audit.js';
 import { getConfigOr } from './system.js';
 import { totalStorageBytes, isStorageConfigured } from './storage.js';
 
@@ -62,10 +63,18 @@ export async function dashboardStats(user: AuthUser): Promise<Record<string, unk
     [modules, alertDays],
   );
 
-  const recentActivity = await many(
-    `SELECT id, user_id, user_email, action, resource_type, resource_id, details, created_at
-       FROM audit_logs ORDER BY created_at DESC LIMIT 10`,
-  );
+  // La actividad reciente es auditoría: solo quien puede leer `/audit` ve la
+  // global; el resto ve únicamente sus propias acciones (DEF-07).
+  const recentActivity = canViewAudit(user)
+    ? await many(
+        `SELECT id, user_id, user_email, action, resource_type, resource_id, details, created_at
+           FROM audit_logs ORDER BY created_at DESC LIMIT 10`,
+      )
+    : await many(
+        `SELECT id, user_id, user_email, action, resource_type, resource_id, details, created_at
+           FROM audit_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
+        [user.id],
+      );
 
   const storageConfigured = await isStorageConfigured();
   let bytes: number | null = Number(summary?.db_bytes ?? 0);

@@ -39,3 +39,6 @@ docs/legacy/supabase_openapi.json
 
 # Configuración local de Claude Code (puede contener credenciales)
 .claude/settings.local.json
+
+# Entorno local de la bateria QA (contiene la contrasena de PostgreSQL)
+qa/.env.qa

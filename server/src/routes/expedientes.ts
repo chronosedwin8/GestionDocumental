@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireModuleAccess, moduleFromBody } from '../middleware/authorize.js';
+import { moduleFromBody, requireFeature, requireModuleAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { buildExport, type ExportFormat } from '../lib/exporters.js';
@@ -52,6 +52,7 @@ const createSchema = z.object({
 
 expedientesRouter.post(
   '/',
+  requireFeature('EXPEDIENTE_CREATE'),
   validateBody(createSchema),
   requireModuleAccess(moduleFromBody('module_code'), 'write'),
   async (req: Request, res: Response) => {
@@ -76,6 +77,7 @@ const correspondenceSchema = z.object({
 
 expedientesRouter.post(
   '/correspondence',
+  requireFeature('CORRESPONDENCE_CREATE'),
   validateBody(correspondenceSchema),
   requireModuleAccess(moduleFromBody('module_code'), 'write'),
   async (req: Request, res: Response) => {
@@ -96,6 +98,7 @@ expedientesRouter.get('/:id', async (req: Request, res: Response) => {
 
 expedientesRouter.patch(
   '/:id',
+  requireFeature('EXPEDIENTE_EDIT'),
   validateBody(
     z.object({
       titulo: z.string().min(3).optional(),
@@ -116,19 +119,19 @@ expedientesRouter.patch(
   },
 );
 
-expedientesRouter.post('/:id/close', async (req: Request, res: Response) => {
+expedientesRouter.post('/:id/close', requireFeature('EXPEDIENTE_CLOSE'), async (req: Request, res: Response) => {
   const expediente = await setExpedienteEstado(currentUser(req), param(req, 'id'), 'CERRADO');
   await audit(req, 'CLOSE_EXPEDIENTE', 'expediente', param(req, 'id'), {});
   res.json(expediente);
 });
 
-expedientesRouter.post('/:id/reopen', async (req: Request, res: Response) => {
+expedientesRouter.post('/:id/reopen', requireFeature('EXPEDIENTE_REOPEN'), async (req: Request, res: Response) => {
   const expediente = await setExpedienteEstado(currentUser(req), param(req, 'id'), 'ABIERTO');
   await audit(req, 'REOPEN_EXPEDIENTE', 'expediente', param(req, 'id'), {});
   res.json(expediente);
 });
 
-expedientesRouter.post('/:id/transfer', async (req: Request, res: Response) => {
+expedientesRouter.post('/:id/transfer', requireFeature('DOCUMENT_TRANSFER'), async (req: Request, res: Response) => {
   const expediente = await setExpedienteEstado(currentUser(req), param(req, 'id'), 'TRANSFERIDO');
   await audit(req, 'TRANSFER_EXPEDIENTE', 'expediente', param(req, 'id'), {});
   res.json(expediente);
@@ -136,6 +139,7 @@ expedientesRouter.post('/:id/transfer', async (req: Request, res: Response) => {
 
 expedientesRouter.post(
   '/:id/respond',
+  requireFeature('EXPEDIENTE_EDIT'),
   validateBody(z.object({ document_id: z.string().uuid().optional() })),
   async (req: Request, res: Response) => {
     const body = req.body as { document_id?: string };
@@ -145,7 +149,7 @@ expedientesRouter.post(
   },
 );
 
-expedientesRouter.delete('/:id', async (req: Request, res: Response) => {
+expedientesRouter.delete('/:id', requireFeature('EXPEDIENTE_DELETE'), async (req: Request, res: Response) => {
   await deleteExpediente(currentUser(req), param(req, 'id'));
   await audit(req, 'DELETE_EXPEDIENTE', 'expediente', param(req, 'id'), {});
   res.status(204).end();
@@ -153,6 +157,7 @@ expedientesRouter.delete('/:id', async (req: Request, res: Response) => {
 
 expedientesRouter.post(
   '/:id/documents',
+  requireFeature('EXPEDIENTE_EDIT'),
   validateBody(z.object({ document_ids: z.array(z.string().uuid()).min(1) })),
   async (req: Request, res: Response) => {
     const body = req.body as { document_ids: string[] };
@@ -162,7 +167,7 @@ expedientesRouter.post(
   },
 );
 
-expedientesRouter.delete('/:id/documents/:documentId', async (req: Request, res: Response) => {
+expedientesRouter.delete('/:id/documents/:documentId', requireFeature('EXPEDIENTE_EDIT'), async (req: Request, res: Response) => {
   const documents = await removeDocument(currentUser(req), param(req, 'id'), param(req, 'documentId'));
   await audit(req, 'REMOVE_EXPEDIENTE_DOCUMENT', 'expediente', param(req, 'id'), {
     document_id: param(req, 'documentId'),
@@ -172,6 +177,7 @@ expedientesRouter.delete('/:id/documents/:documentId', async (req: Request, res:
 
 expedientesRouter.put(
   '/:id/documents/order',
+  requireFeature('EXPEDIENTE_EDIT'),
   validateBody(z.object({ document_ids: z.array(z.string().uuid()).min(1) })),
   async (req: Request, res: Response) => {
     const body = req.body as { document_ids: string[] };

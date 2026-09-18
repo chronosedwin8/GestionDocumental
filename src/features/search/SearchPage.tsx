@@ -6,6 +6,7 @@ import { ApiError } from '@/api/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCatalogs } from '@/contexts/CatalogContext';
 import { usePagination } from '@/hooks/usePagination';
+import { useFeature } from '@/hooks/useFeature';
 import { useQuery } from '@/hooks/useQuery';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { HelpButton } from '@/components/help/HelpButton';
@@ -112,6 +113,9 @@ export default function SearchPage(): React.JSX.Element {
   const [semLoading, setSemLoading] = useState(false);
   const [semError, setSemError] = useState<ApiError | null>(null);
 
+  // Característica del rol: sin ella el servidor rechaza con 403.
+  const canSearchSemantic = useFeature('SEARCH_SEMANTIC');
+
   const runSemantic = useCallback(async (): Promise<void> => {
     const query = semTerm.trim();
     if (!query) return;
@@ -173,7 +177,10 @@ export default function SearchPage(): React.JSX.Element {
             id: 'semantica',
             label: 'Semántica (IA)',
             icon: <Sparkles className="h-3.5 w-3.5" aria-hidden />,
-            disabled: settings ? !settings.ai_enabled : false,
+            // `POST /search/semantic` responde **siempre** 503
+            // `AI_NOT_CONFIGURED` sin motor de IA (CONTRACT_NOTES §9), así que
+            // el modo se deshabilita en vez de ofrecer una búsqueda que falla.
+            disabled: (settings ? !settings.ai_enabled : false) || !canSearchSemantic,
           },
           { id: 'texto', label: 'Texto completo', icon: <Type className="h-3.5 w-3.5" aria-hidden /> },
           { id: 'avanzada', label: 'Avanzada', icon: <Filter className="h-3.5 w-3.5" aria-hidden /> },
@@ -455,7 +462,13 @@ export default function SearchPage(): React.JSX.Element {
       {mode === 'semantica' && settings && !settings.ai_enabled && (
         <ApiErrorState
           className="mt-4"
-          error={new ApiError('AI_NOT_CONFIGURED', 'IA no disponible.', 503)}
+          error={
+            new ApiError(
+              'AI_NOT_CONFIGURED',
+              'La búsqueda semántica necesita el motor de IA configurado en el servidor; sin él responde 503.',
+              503,
+            )
+          }
         />
       )}
 

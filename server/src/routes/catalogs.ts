@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import {
@@ -64,7 +64,7 @@ const MODULE_COLUMNS = [
   'is_active',
 ] as const;
 
-catalogsRouter.post('/modules', requireFullAccess, validateBody(moduleSchema), async (req: Request, res: Response) => {
+catalogsRouter.post('/modules', requireFullAccess, requireFeature('CATALOG_MANAGE'), validateBody(moduleSchema), async (req: Request, res: Response) => {
   const body = req.body as z.infer<typeof moduleSchema>;
   if (!body.code) {
     res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'El código del módulo es obligatorio.' } });
@@ -79,6 +79,7 @@ catalogsRouter.post('/modules', requireFullAccess, validateBody(moduleSchema), a
 catalogsRouter.put(
   '/modules/:code',
   requireFullAccess,
+  requireFeature('CATALOG_MANAGE'),
   validateBody(moduleSchema.partial({ name: true, s3_folder: true, folio_prefix: true, radicado_prefix: true })),
   async (req: Request, res: Response) => {
     const row = await upsertCatalogRow('modules', MODULE_COLUMNS, param(req, 'code'), req.body as Record<string, unknown>);
@@ -103,7 +104,7 @@ const roleSchema = z.object({
 
 const ROLE_COLUMNS = ['name', 'description', 'has_full_access', 'can_manage_users', 'sort_order'] as const;
 
-catalogsRouter.post('/roles', requireFullAccess, validateBody(roleSchema), async (req: Request, res: Response) => {
+catalogsRouter.post('/roles', requireFullAccess, requireFeature('ROLE_MANAGE'), validateBody(roleSchema), async (req: Request, res: Response) => {
   const body = req.body as z.infer<typeof roleSchema>;
   if (!body.code) {
     res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'El código del rol es obligatorio.' } });
@@ -117,6 +118,7 @@ catalogsRouter.post('/roles', requireFullAccess, validateBody(roleSchema), async
 catalogsRouter.put(
   '/roles/:code',
   requireFullAccess,
+  requireFeature('ROLE_MANAGE'),
   validateBody(roleSchema.partial({ name: true })),
   async (req: Request, res: Response) => {
     const row = await upsertCatalogRow('roles', ROLE_COLUMNS, param(req, 'code'), req.body as Record<string, unknown>);
@@ -132,6 +134,7 @@ catalogsRouter.get('/document-statuses', async (_req: Request, res: Response) =>
 catalogsRouter.put(
   '/document-statuses/:code',
   requireFullAccess,
+  requireFeature('CATALOG_MANAGE'),
   validateBody(
     z.object({
       name: z.string().min(2).optional(),
@@ -160,6 +163,7 @@ catalogsRouter.get('/dispositions', async (_req: Request, res: Response) => {
 catalogsRouter.put(
   '/dispositions/:code',
   requireFullAccess,
+  requireFeature('CATALOG_MANAGE'),
   validateBody(
     z.object({
       name: z.string().min(2).optional(),
@@ -186,6 +190,7 @@ catalogsRouter.get('/notification-types', async (_req: Request, res: Response) =
 catalogsRouter.put(
   '/notification-types/:code',
   requireFullAccess,
+  requireFeature('CATALOG_MANAGE'),
   validateBody(z.object({ name: z.string().optional(), icon: z.string().optional(), color: z.string().optional() })),
   async (req: Request, res: Response) => {
     const row = await upsertCatalogRow(
@@ -205,6 +210,7 @@ catalogsRouter.get('/correspondence-types', async (_req: Request, res: Response)
 catalogsRouter.put(
   '/correspondence-types/:code',
   requireFullAccess,
+  requireFeature('CATALOG_MANAGE'),
   validateBody(
     z.object({
       name: z.string().optional(),
@@ -230,6 +236,7 @@ catalogsRouter.get('/person-types', async (_req: Request, res: Response) => {
 catalogsRouter.put(
   '/person-types/:code',
   requireFullAccess,
+  requireFeature('CATALOG_MANAGE'),
   validateBody(z.object({ name: z.string().min(2) })),
   async (req: Request, res: Response) => {
     const row = await upsertCatalogRow('person_types', ['name'], param(req, 'code'), req.body as Record<string, unknown>);

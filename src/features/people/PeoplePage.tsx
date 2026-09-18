@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Toolbar } from '@/components/ui/Toolbar';
 import type { PersonSummary } from '@/types/api';
+import { useFeature } from '@/hooks/useFeature';
 import type { Column } from '@/types/ui';
 import { PersonForm } from './PersonForm';
 
@@ -34,7 +35,10 @@ export default function PeoplePage(): React.JSX.Element {
   const statusFilter = searchParams.get('estado') ?? '';
   const [creating, setCreating] = useState(false);
 
-  const canEdit = hasFullAccess || canManageUsers;
+  // `POST/PATCH /people` responde 403 sin escritura en alguna dependencia
+  // (CONTRACT_NOTES §9), así que la alta se ofrece solo con la característica.
+  const canManagePeople = useFeature('PEOPLE_MANAGE');
+  const canEdit = (hasFullAccess || canManageUsers) && canManagePeople;
 
   const setParam = (key: string, value: string): void => {
     const next = new URLSearchParams(searchParams);
@@ -190,7 +194,9 @@ export default function PeoplePage(): React.JSX.Element {
           emptyDescription={
             filtersApplied
               ? 'Ninguna persona cumple los filtros seleccionados.'
-              : 'Registra empleados y estudiantes para abrir sus expedientes automáticamente.'
+              : // `GET /people` está filtrado por las dependencias legibles: sin
+                // ninguna, el servidor responde 200 con total 0. No es un fallo.
+                'No hay personas visibles para ti. O todavía no se ha registrado ninguna, o tu rol no tiene acceso de lectura a las dependencias donde están.'
           }
           emptyAction={
             canEdit && !filtersApplied

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../middleware/auth.js';
+import { requireFeature } from '../middleware/authorize.js';
 import { validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { listLoans, listMyLoans, returnLoan } from '../services/loans.js';
@@ -28,7 +29,7 @@ loansRouter.get(
   },
 );
 
-loansRouter.post('/:id/return', async (req: Request, res: Response) => {
+loansRouter.post('/:id/return', requireFeature('LOAN_RETURN'), async (req: Request, res: Response) => {
   const loan = await returnLoan(currentUser(req), param(req, 'id'));
   await audit(req, 'RETURN_LOAN', 'loan', param(req, 'id'), {});
   res.json(loan);

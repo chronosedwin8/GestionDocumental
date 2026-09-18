@@ -15,6 +15,7 @@ import { useCatalogs } from '@/contexts/CatalogContext';
 import { invalidatePrefix, useQuery } from '@/hooks/useQuery';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { HelpButton } from '@/components/help/HelpButton';
+import { useFeature } from '@/hooks/useFeature';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -58,7 +59,8 @@ export default function PersonDetailPage(): React.JSX.Element {
   const [addingEvent, setAddingEvent] = useState(false);
   const [periodFilter, setPeriodFilter] = useState('');
 
-  const canEdit = hasFullAccess || canManageUsers;
+  const canManagePeople = useFeature('PEOPLE_MANAGE');
+  const canEdit = (hasFullAccess || canManageUsers) && canManagePeople;
 
   const person = useQuery(id ? `person:${id}` : null, (signal) => peopleApi.getPerson(id, signal));
   const expedientes = useQuery(id ? `person:${id}:expedientes` : null, (signal) =>
@@ -98,6 +100,21 @@ export default function PersonDetailPage(): React.JSX.Element {
     : documentList;
 
   if (person.error) {
+    // `GET /people/:id` responde 404 tanto si la persona no existe como si el
+    // usuario no tiene ninguna dependencia legible (CONTRACT_NOTES §9): el
+    // servidor no distingue los dos casos y la interfaz tampoco lo inventa.
+    if (person.error.code === 'NOT_FOUND') {
+      return (
+        <>
+          <PageHeader title="Persona" icon={<UserRound className="h-5 w-5 text-acid" aria-hidden />} />
+          <EmptyState
+            title="Ficha no disponible"
+            description="Esta persona no existe o no tienes acceso a las dependencias donde está su información."
+            action={{ label: 'Volver a personas', to: '/personas' }}
+          />
+        </>
+      );
+    }
     return (
       <>
         <PageHeader title="Persona" icon={<UserRound className="h-5 w-5 text-acid" aria-hidden />} />

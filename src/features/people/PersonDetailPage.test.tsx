@@ -7,7 +7,14 @@ import PersonDetailPage from './PersonDetailPage';
 import type { ApiDocument, Expediente, Person, PersonEvent } from '@/types/api';
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ hasFullAccess: true, canManageUsers: true, isAdminArea: true }),
+  // `hasFeature` lo consulta `useFeature`: la ficha oculta la edición sin
+  // la característica PEOPLE_MANAGE (docs/PERMISOS_Y_USUARIOS.md §3).
+  useAuth: () => ({
+    hasFullAccess: true,
+    canManageUsers: true,
+    isAdminArea: true,
+    hasFeature: () => true,
+  }),
 }));
 
 vi.mock('@/contexts/HelpContext', () => ({

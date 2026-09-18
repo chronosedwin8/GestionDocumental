@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { many, query } from '../db/pool.js';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { canAccessModule } from '../services/access.js';
 import { audit } from '../services/audit.js';
@@ -30,7 +30,7 @@ const matrixSchema = z.object({
   can_write: z.boolean(),
 });
 
-accessRouter.put('/matrix', requireFullAccess, validateBody(matrixSchema), async (req: Request, res: Response) => {
+accessRouter.put('/matrix', requireFullAccess, requireFeature('ACCESS_MATRIX_MANAGE'), validateBody(matrixSchema), async (req: Request, res: Response) => {
   const body = req.body as z.infer<typeof matrixSchema>;
   await query(
     `INSERT INTO role_module_access (role_code, module_code, can_read, can_write)

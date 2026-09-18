@@ -1,14 +1,14 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireAnyModuleAccess, requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { listDocuments } from '../services/documents.js';
 import {
   addPersonEvent,
   createPerson,
-  getPersonWithCompleteness,
+  getPersonForUser,
   listPeople,
   listPersonEvents,
   listPersonExpedientes,
@@ -36,6 +36,7 @@ peopleRouter.get(
 peopleRouter.put(
   '/required-documents',
   requireFullAccess,
+  requireFeature('PEOPLE_MANAGE'),
   validateBody(
     z.object({
       person_type_code: z.string().min(2),
@@ -59,7 +60,7 @@ const listQuery = z.object({
 });
 
 peopleRouter.get('/', validateQuery(listQuery), async (req: Request, res: Response) => {
-  res.json(await listPeople(req.query as z.infer<typeof listQuery>));
+  res.json(await listPeople(currentUser(req), req.query as z.infer<typeof listQuery>));
 });
 
 const personSchema = z.object({
@@ -78,7 +79,7 @@ const personSchema = z.object({
   extra: z.record(z.string(), z.unknown()).optional(),
 });
 
-peopleRouter.post('/', validateBody(personSchema), async (req: Request, res: Response) => {
+peopleRouter.post('/', requireAnyModuleAccess('write'), requireFeature('PEOPLE_MANAGE'), validateBody(personSchema), async (req: Request, res: Response) => {
   const person = await createPerson(currentUser(req), req.body as Record<string, unknown>);
   await audit(req, 'CREATE_PERSON', 'person', person.id as string, {
     type_code: person.type_code,
@@ -88,29 +89,37 @@ peopleRouter.post('/', validateBody(personSchema), async (req: Request, res: Res
 });
 
 peopleRouter.get('/:id', async (req: Request, res: Response) => {
-  res.json(await getPersonWithCompleteness(param(req, 'id')));
+  res.json(await getPersonForUser(currentUser(req), param(req, 'id')));
 });
 
-peopleRouter.patch('/:id', validateBody(personSchema.partial()), async (req: Request, res: Response) => {
-  const person = await updatePerson(param(req, 'id'), req.body as Record<string, unknown>);
-  await audit(req, 'UPDATE_PERSON', 'person', param(req, 'id'), req.body as Record<string, unknown>);
-  res.json(person);
-});
+peopleRouter.patch(
+  '/:id',
+  requireAnyModuleAccess('write'),
+  requireFeature('PEOPLE_MANAGE'),
+  validateBody(personSchema.partial()),
+  async (req: Request, res: Response) => {
+    const person = await updatePerson(param(req, 'id'), req.body as Record<string, unknown>);
+    await audit(req, 'UPDATE_PERSON', 'person', param(req, 'id'), req.body as Record<string, unknown>);
+    res.json(person);
+  },
+);
 
 peopleRouter.get('/:id/expedientes', async (req: Request, res: Response) => {
-  res.json(await listPersonExpedientes(param(req, 'id')));
+  res.json(await listPersonExpedientes(currentUser(req), param(req, 'id')));
 });
 
 peopleRouter.get('/:id/documents', async (req: Request, res: Response) => {
   res.json(await listDocuments(currentUser(req), { person_id: param(req, 'id'), pageSize: 100 }));
 });
 
-peopleRouter.get('/:id/events', async (req: Request, res: Response) => {
+peopleRouter.get('/:id/events', requireAnyModuleAccess('read'), async (req: Request, res: Response) => {
   res.json(await listPersonEvents(param(req, 'id')));
 });
 
 peopleRouter.post(
   '/:id/events',
+  requireAnyModuleAccess('write'),
+  requireFeature('PERSON_EVENT_ADD'),
   validateBody(
     z.object({
       event_type: z.string().min(2),

@@ -9,8 +9,16 @@ export function notFoundHandler(_req: Request, res: Response): void {
   });
 }
 
-type PgError = Error & { code?: string; constraint?: string; detail?: string };
+type PgError = Error & { code?: string; constraint?: string; detail?: string; column?: string };
 
+/**
+ * Traduce los errores del motor a errores de contrato.
+ *
+ * Nunca se propaga el `detail` de PostgreSQL: reproduce literalmente **todas las
+ * columnas de la fila que falla**, incluidas las que la API jamás expone
+ * (`system_config`, `users`…). Del error solo sobreviven el nombre de la
+ * restricción o de la columna, que forman parte del contrato público (DEF-12).
+ */
 function translatePgError(error: PgError): ApiError | null {
   switch (error.code) {
     case '23505':
@@ -18,7 +26,7 @@ function translatePgError(error: PgError): ApiError | null {
     case '23503':
       return ApiError.badRequest('El registro referenciado no existe.', { constraint: error.constraint });
     case '23502':
-      return ApiError.badRequest('Falta un campo obligatorio.', { detail: error.detail });
+      return ApiError.badRequest('Falta un campo obligatorio.', { column: error.column });
     case '22P02':
       return ApiError.badRequest('Un identificador enviado no tiene un formato válido.');
     case '23514':

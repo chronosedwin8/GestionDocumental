@@ -2,6 +2,7 @@ import { api } from './client';
 import type {
   JobInfo,
   JobRun,
+  PasswordPolicy,
   SmtpTestResult,
   StorageTestResult,
   SystemConfigItem,
@@ -38,4 +39,20 @@ export function runJob(job: string): Promise<JobRun> {
 
 export function health(signal?: AbortSignal): Promise<SystemHealth> {
   return api.get<SystemHealth>('/system/health', undefined, signal);
+}
+
+/* ------------------------------------------------ política de contraseñas */
+
+/**
+ * La política real que aplica el servidor (`system_config.password_policy`).
+ * El indicador de fortaleza se mide contra esto, nunca contra una regla
+ * inventada en el cliente.
+ */
+export function getPasswordPolicy(signal?: AbortSignal): Promise<PasswordPolicy> {
+  return api.get<PasswordPolicy>('/system/password-policy', undefined, signal);
+}
+
+/** Requiere `SYSTEM_CONFIG_EDIT`. */
+export function setPasswordPolicy(policy: PasswordPolicy): Promise<PasswordPolicy> {
+  return api.put<PasswordPolicy>('/system/password-policy', policy);
 }

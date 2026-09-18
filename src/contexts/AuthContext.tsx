@@ -42,6 +42,15 @@ export interface AuthContextValue {
   effectiveModules: EffectiveModule[];
   canRead: (moduleCode: string) => boolean;
   canWrite: (moduleCode: string) => boolean;
+
+  /**
+   * Características habilitadas para el rol del usuario (`effective_features`
+   * de `GET /auth/me`). `null` cuando el servidor todavía no publica el campo:
+   * en ese caso la interfaz **no** oculta nada, porque ocultar sin dato sería
+   * inventar una restricción. La decisión vinculante es siempre del servidor.
+   */
+  effectiveFeatures: string[] | null;
+  hasFeature: (code: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -168,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }, []);
 
   const effectiveModules = user?.effective_modules ?? [];
+  const effectiveFeatures = user?.effective_features ?? null;
 
   const canRead = useCallback(
     (moduleCode: string): boolean => {
@@ -185,6 +195,21 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       return effectiveModules.some((m) => m.code === moduleCode && m.can_write);
     },
     [user, effectiveModules],
+  );
+
+  const featureSet = useMemo(
+    () => (effectiveFeatures ? new Set(effectiveFeatures) : null),
+    [effectiveFeatures],
+  );
+
+  const hasFeature = useCallback(
+    (code: string): boolean => {
+      if (!user) return false;
+      // Sin catálogo publicado no se oculta nada: el servidor rechaza si toca.
+      if (!featureSet) return true;
+      return featureSet.has(code);
+    },
+    [user, featureSet],
   );
 
   const value = useMemo<AuthContextValue>(
@@ -206,6 +231,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       effectiveModules,
       canRead,
       canWrite,
+      effectiveFeatures,
+      hasFeature,
     }),
     [
       user,
@@ -220,6 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       effectiveModules,
       canRead,
       canWrite,
+      effectiveFeatures,
+      hasFeature,
     ],
   );
 

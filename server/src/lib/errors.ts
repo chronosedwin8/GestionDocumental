@@ -3,6 +3,9 @@ export type ErrorCode =
   | 'UNAUTHORIZED'
   | 'TOKEN_EXPIRED'
   | 'FORBIDDEN'
+  | 'FEATURE_DISABLED'
+  | 'CORE_FEATURE'
+  | 'PASSWORD_REUSED'
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'RATE_LIMITED'
@@ -41,6 +44,16 @@ export class ApiError extends Error {
   }
   static forbidden(message = 'No tienes permiso para realizar esta acción.'): ApiError {
     return new ApiError(403, 'FORBIDDEN', message);
+  }
+  /** La característica está desactivada para el rol del usuario. */
+  static featureDisabled(feature: string, label?: string): ApiError {
+    return new ApiError(
+      403,
+      'FEATURE_DISABLED',
+      `La característica «${label ?? feature}» está desactivada para tu rol. ` +
+        'Solicítala al administrador del sistema.',
+      { feature },
+    );
   }
   static notFound(message = 'El recurso solicitado no existe.'): ApiError {
     return new ApiError(404, 'NOT_FOUND', message);

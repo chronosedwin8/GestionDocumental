@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../lib/errors.js';
-import { canAccessModule, type Permission } from '../services/access.js';
+import { canAccessModule, hasAnyModuleAccess, type Permission } from '../services/access.js';
+import { getFeature, hasFeature } from '../services/features.js';
 import { currentUser } from './auth.js';
 
 /** Exige que el rol del usuario esté en la lista. */
@@ -42,6 +43,54 @@ export function requireUserManager(req: Request, _res: Response, next: NextFunct
   } catch (error) {
     next(error);
   }
+}
+
+/**
+ * Exige el permiso indicado en **algún** módulo. Protege los recursos
+ * transversales que no cuelgan de un módulo concreto —el directorio de personas
+ * y sus eventos— de las cuentas sin ningún acceso concedido.
+ */
+export function requireAnyModuleAccess(permission: Permission = 'read') {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = currentUser(req);
+      if (!(await hasAnyModuleAccess(user, permission))) {
+        throw ApiError.forbidden(
+          permission === 'write'
+            ? 'No tienes permiso de escritura en ninguna dependencia.'
+            : 'No tienes acceso a ninguna dependencia.',
+        );
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+/**
+ * Exige que la característica esté habilitada para el rol del usuario.
+ *
+ * **Se SUMA a las comprobaciones de módulo y de documento, nunca las
+ * sustituye**: para actuar hacen falta las dos condiciones (regla 1 de
+ * `docs/PERMISOS_Y_USUARIOS.md`). Por eso se monta después de
+ * `requireModuleAccess`/`requireFullAccess` allí donde estos existen, para que
+ * el motivo del rechazo siga siendo el mismo que antes cuando el módulo ya lo
+ * impedía.
+ */
+export function requireFeature(code: string) {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = currentUser(req);
+      if (!(await hasFeature(user, code))) {
+        const feature = await getFeature(code);
+        throw ApiError.featureDisabled(code, feature?.name);
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export type ModuleResolver = (req: Request) => string | undefined | Promise<string | undefined>;

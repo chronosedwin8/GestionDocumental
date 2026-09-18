@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { HelpButton } from '@/components/help/HelpButton';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Badge } from '@/components/ui/Badge';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/Input';
@@ -237,25 +238,29 @@ export default function TrashPage(): React.JSX.Element {
           caption="Documentos en la papelera"
           rowActions={(doc) => (
             <>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => void restore(doc)}
-                icon={<RotateCcw className="h-3.5 w-3.5" />}
-              >
-                Restaurar
-              </Button>
-              {hasFullAccess && (
+              <IfFeature code="TRASH_RESTORE">
                 <Button
                   size="sm"
-                  variant="danger"
+                  variant="outline"
                   disabled={busy}
-                  onClick={() => void purge(doc)}
-                  icon={<Trash2 className="h-3.5 w-3.5" />}
+                  onClick={() => void restore(doc)}
+                  icon={<RotateCcw className="h-3.5 w-3.5" />}
                 >
-                  Eliminar
+                  Restaurar
                 </Button>
+              </IfFeature>
+              {hasFullAccess && (
+                <IfFeature code="TRASH_PURGE">
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={busy}
+                    onClick={() => void purge(doc)}
+                    icon={<Trash2 className="h-3.5 w-3.5" />}
+                  >
+                    Eliminar
+                  </Button>
+                </IfFeature>
               )}
             </>
           )}

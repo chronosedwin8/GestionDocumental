@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { ApiError } from '../lib/errors.js';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { chatOverDocument, classifyDocument, extractMetadata } from '../services/ai.js';
@@ -45,7 +45,7 @@ const analyzeSchema = z.object({
   include_metadata: z.boolean().optional().default(false),
 });
 
-aiRouter.post('/analyze', validateBody(analyzeSchema), async (req: Request, res: Response) => {
+aiRouter.post('/analyze', requireFeature('AI_ANALYZE'), validateBody(analyzeSchema), async (req: Request, res: Response) => {
   await assertAiConfigured();
   const body = req.body as z.infer<typeof analyzeSchema>;
   const result = await analyzeDocumentNow(currentUser(req), body.document_id, {
@@ -68,7 +68,7 @@ const ocrSchema = z.object({
   force: z.boolean().optional().default(false),
 });
 
-aiRouter.post('/ocr', validateBody(ocrSchema), async (req: Request, res: Response) => {
+aiRouter.post('/ocr', requireFeature('AI_OCR'), validateBody(ocrSchema), async (req: Request, res: Response) => {
   await assertAiConfigured();
   const user = currentUser(req);
   const body = req.body as z.infer<typeof ocrSchema>;
@@ -95,7 +95,7 @@ const classifySchema = z.union([
   }),
 ]);
 
-aiRouter.post('/classify', validateBody(classifySchema), async (req: Request, res: Response) => {
+aiRouter.post('/classify', requireFeature('AI_CLASSIFY'), validateBody(classifySchema), async (req: Request, res: Response) => {
   await assertAiConfigured();
   const user = currentUser(req);
   const body = req.body as z.infer<typeof classifySchema>;
@@ -147,7 +147,7 @@ const extractSchema = z.object({
   persist: z.boolean().optional().default(true),
 });
 
-aiRouter.post('/extract-metadata', validateBody(extractSchema), async (req: Request, res: Response) => {
+aiRouter.post('/extract-metadata', requireFeature('AI_EXTRACT_METADATA'), validateBody(extractSchema), async (req: Request, res: Response) => {
   await assertAiConfigured();
   const user = currentUser(req);
   const body = req.body as z.infer<typeof extractSchema>;
@@ -192,6 +192,7 @@ const reprocessSchema = z.object({
 aiRouter.post(
   '/reprocess',
   requireFullAccess,
+  requireFeature('AI_REPROCESS'),
   validateBody(reprocessSchema),
   async (req: Request, res: Response) => {
     await assertAiConfigured();
@@ -213,7 +214,7 @@ const usageQuery = z.object({
   to: z.string().optional(),
 });
 
-aiRouter.get('/usage', requireFullAccess, validateQuery(usageQuery), async (req: Request, res: Response) => {
+aiRouter.get('/usage', requireFullAccess, requireFeature('AI_USAGE_VIEW'), validateQuery(usageQuery), async (req: Request, res: Response) => {
   const params = req.query as unknown as z.infer<typeof usageQuery>;
   const today = new Date().toISOString().slice(0, 10);
   const defaultFrom = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
@@ -231,7 +232,7 @@ const chatSchema = z.object({
     .default([]),
 });
 
-aiRouter.post('/chat', validateBody(chatSchema), async (req: Request, res: Response) => {
+aiRouter.post('/chat', requireFeature('AI_CHAT'), validateBody(chatSchema), async (req: Request, res: Response) => {
   await assertAiConfigured();
   const user = currentUser(req);
   const body = req.body as z.infer<typeof chatSchema>;

@@ -14,10 +14,43 @@ export type ConfigRow = {
 
 export type PasswordPolicy = {
   min_length: number;
-  require_uppercase: boolean;
-  require_number: boolean;
+  require_upper: boolean;
+  require_lower: boolean;
+  require_digit: boolean;
+  require_symbol: boolean;
   max_attempts: number;
   lockout_minutes: number;
+  /** `null` = las contraseñas no caducan. */
+  expiry_days: number | null;
+  /** 0 = no se guarda historial y no se impide reutilizar. */
+  history_count: number;
+  temporary_ttl_hours: number;
+};
+
+/** Datos del emisor y reglas del panel comercial (`system_config.billing`). */
+export type BillingIssuer = {
+  name: string;
+  legal_name?: string;
+  document_type?: string;
+  document_number?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  bank_details?: string;
+};
+
+export type BillingConfig = {
+  currency: string;
+  tax_rate: number;
+  tax_name: string;
+  payment_terms_days: number;
+  quote_validity_days: number;
+  issuer: BillingIssuer;
+  quote_terms: string;
+  invoice_notes: string;
 };
 
 export type AwsConfig = {
@@ -255,14 +288,76 @@ export async function getAiVisionModel(): Promise<string> {
   return getConfigOr<string>('ai_vision_model', await getAiModel());
 }
 
+/**
+ * Valores de último recurso: solo se usan si falta la fila sembrada
+ * `system_config.password_policy`. La política real es un DATO editable.
+ */
+export const FALLBACK_PASSWORD_POLICY: PasswordPolicy = {
+  min_length: 8,
+  require_upper: true,
+  require_lower: false,
+  require_digit: true,
+  require_symbol: false,
+  max_attempts: 5,
+  lockout_minutes: 15,
+  expiry_days: null,
+  history_count: 0,
+  temporary_ttl_hours: 72,
+};
+
+function toBool(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function toInt(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
+/**
+ * Normaliza la política guardada. Se aceptan los nombres heredados
+ * (`require_uppercase`, `require_number`) para no romper las instalaciones
+ * anteriores a la migración 014; los nombres del contrato tienen prioridad.
+ */
+export function normalizePasswordPolicy(stored: Record<string, unknown> | null): PasswordPolicy {
+  const raw = stored ?? {};
+  const expiry = raw.expiry_days;
+  return {
+    min_length: toInt(raw.min_length, FALLBACK_PASSWORD_POLICY.min_length),
+    require_upper: toBool(raw.require_upper, toBool(raw.require_uppercase, FALLBACK_PASSWORD_POLICY.require_upper)),
+    require_lower: toBool(raw.require_lower, FALLBACK_PASSWORD_POLICY.require_lower),
+    require_digit: toBool(raw.require_digit, toBool(raw.require_number, FALLBACK_PASSWORD_POLICY.require_digit)),
+    require_symbol: toBool(raw.require_symbol, FALLBACK_PASSWORD_POLICY.require_symbol),
+    max_attempts: toInt(raw.max_attempts, FALLBACK_PASSWORD_POLICY.max_attempts),
+    lockout_minutes: toInt(raw.lockout_minutes, FALLBACK_PASSWORD_POLICY.lockout_minutes),
+    expiry_days: expiry === null || expiry === undefined ? null : toInt(expiry, 0) || null,
+    history_count: Math.max(0, toInt(raw.history_count, FALLBACK_PASSWORD_POLICY.history_count)),
+    temporary_ttl_hours: Math.max(
+      1,
+      toInt(raw.temporary_ttl_hours, FALLBACK_PASSWORD_POLICY.temporary_ttl_hours),
+    ),
+  };
+}
+
 export async function getPasswordPolicy(): Promise<PasswordPolicy> {
-  return getConfigOr<PasswordPolicy>('password_policy', {
-    min_length: 8,
-    require_uppercase: true,
-    require_number: true,
-    max_attempts: 5,
-    lockout_minutes: 15,
-  });
+  const stored = await getConfig<Record<string, unknown>>('password_policy');
+  return normalizePasswordPolicy(stored);
+}
+
+/** Configuración comercial normalizada (impuesto, plazos y emisor del PDF). */
+export async function getBillingConfig(): Promise<BillingConfig> {
+  const stored = (await getConfig<Record<string, unknown>>('billing')) ?? {};
+  const issuer = (stored.issuer as BillingIssuer | undefined) ?? { name: 'EduArchive SGDEA' };
+  return {
+    currency: typeof stored.currency === 'string' ? stored.currency : 'COP',
+    tax_rate: Number.isFinite(Number(stored.tax_rate)) ? Number(stored.tax_rate) : 19,
+    tax_name: typeof stored.tax_name === 'string' ? stored.tax_name : 'IVA',
+    payment_terms_days: toInt(stored.payment_terms_days, 30),
+    quote_validity_days: toInt(stored.quote_validity_days, 30),
+    issuer: { ...issuer, name: issuer.name || 'EduArchive SGDEA' },
+    quote_terms: typeof stored.quote_terms === 'string' ? stored.quote_terms : '',
+    invoice_notes: typeof stored.invoice_notes === 'string' ? stored.invoice_notes : '',
+  };
 }
 
 export async function getPublicSettings(): Promise<Record<string, unknown>> {

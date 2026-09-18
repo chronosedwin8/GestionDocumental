@@ -6,7 +6,7 @@ Todas las respuestas son JSON salvo SSE y descargas. Fechas en ISO 8601 UTC. IDs
 ## Convenciones
 
 - **Autenticación**: header `Authorization: Bearer <accessToken>`. Refresh token en cookie `httpOnly` `ea_refresh` (`SameSite=Lax`, `Secure` en producción), path `/api/auth`.
-- **Errores**: siempre `{ "error": { "code": "STRING_CODE", "message": "texto en español", "details"?: any } }` con HTTP 400/401/403/404/409/422/429/500. Códigos mínimos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `STORAGE_NOT_CONFIGURED`, `AI_NOT_CONFIGURED`, `INTERNAL`.
+- **Errores**: siempre `{ "error": { "code": "STRING_CODE", "message": "texto en español", "details"?: any } }`. `details` solo lleva información del contrato (nombre de la restricción o de la columna); **nunca** el `detail` del motor de base de datos, que reproduce la fila completa. con HTTP 400/401/403/404/409/422/429/500. Códigos mínimos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `TOKEN_EXPIRED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `STORAGE_NOT_CONFIGURED`, `AI_NOT_CONFIGURED`, `INTERNAL`.
 - **Paginación**: query `page` (1-based, default 1) y `pageSize` (default 20, max 100). Respuesta `{ "data": T[], "page", "pageSize", "total" }`.
 - **Orden**: `sort=campo` y `order=asc|desc` donde aplique.
 - **Catálogo de módulos**: los códigos de módulo (`ACADEMIC`, …) provienen de `modules.code`. El cliente no asume la lista.
@@ -62,7 +62,7 @@ type Person = PersonSummary & { email: string|null; phone: string|null; birth_da
 type PersonEvent = { id: string; person_id: string; event_type: string; title: string; description: string|null; event_date: string; document_id: string|null; created_by: string; created_by_user: { id: string; full_name: string }; created_at: string };
 type AcademicPeriod = { id: string; name: string; start_date: string; end_date: string; is_current: boolean };
 type HelpArticle = { id: string; slug: string; title: string; body_md: string; module_code: string|null; role_codes: string[]|null; sort_order: number; updated_at: string };
-type SystemConfigItem = { key: string; value: any; is_secret: boolean; description: string|null; updated_by: string|null; updated_at: string }; // para is_secret, value se devuelve enmascarado: { masked: true, hint: "AKIA…LPF" }
+type SystemConfigItem = { key: string; value: any; is_secret: boolean; description: string|null; updated_by: string|null; updated_at: string }; // para is_secret, value se devuelve enmascarado: { masked: true, hint: "AKIA…XXXX" }
 type JobRun = { id: string; job: string; started_at: string; finished_at: string|null; status: 'RUNNING'|'OK'|'ERROR'; details: any };
 ```
 
@@ -81,6 +81,11 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 
 ## Catálogos — `/catalogs`
 
+> Los `PUT /catalogs/<catálogo>/:code` son **parciales**: solo se escriben los campos enviados
+> y el resto de la fila queda intacto. Enviar un subconjunto de campos sobre una fila existente
+> responde 200 (antes fallaba con 400 al violar `NOT NULL`). Si el código no existe, el `PUT`
+> crea la fila y entonces sí son obligatorios los campos `NOT NULL`.
+
 | GET | `/catalogs` | `Catalogs` | Público para autenticados. Cache 5 min con `ETag`. |
 | GET/PUT | `/catalogs/modules`, `/catalogs/modules/:code` | Admin: crear/editar módulos (`Module`). | Al crear un módulo se generan filas en `role_module_access` para todos los roles con `can_read=false`. |
 | GET/PUT | `/catalogs/roles`, `/catalogs/roles/:code` | Admin. Roles `is_system` no se eliminan. |
@@ -90,9 +95,9 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 
 | GET | `/users?search=&role=&active=&page=` | `Paginated<User>` |
 | POST | `/users` | `{ email, full_name, role_code, department_code?, allowed_modules?, temporary_password? }` → `User` (+ `temporary_password` si se generó). |
-| PATCH | `/users/:id` | Partial `User` (no `password`). |
+| PATCH | `/users/:id` | Partial `User` (no `password`). **Salvaguardas de gobierno**, todas 409 `CONFLICT`: nadie cambia su propio `role_code` ni se desactiva a sí mismo; la cuenta administradora fundacional (la más antigua con `roles.has_full_access`) no se degrada ni se desactiva desde la API; y ningún cambio puede dejar el sistema sin al menos un usuario activo con acceso total. |
 | POST | `/users/:id/reset-password` | `{ temporary_password? }` → `{ temporary_password }`; pone `must_change_password=true`, revoca refresh tokens. |
-| POST | `/users/:id/activate` / `/deactivate` | 204 |
+| POST | `/users/:id/activate` / `/deactivate` | 204. `deactivate` aplica las mismas salvaguardas de gobierno que el `PATCH` (409 `CONFLICT`). |
 | GET | `/users/:id/sessions` / DELETE `/users/:id/sessions` | listar / revocar sesiones. |
 
 ## Acceso — `/access`
@@ -109,21 +114,21 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 | POST | `/documents` | `multipart/form-data`: `file` (obligatorio), `title?`, `type` (obligatorio; debe existir en `retention_rules` del módulo salvo que `settings.require_trd=false`), `module_code`, `category?`, `subcategory?`, `person_id?`, `academic_period_id?`, `tags?` (JSON array), `client_sha256?`. Sube a S3, calcula SHA-256 (409 `HASH_MISMATCH` si difiere del cliente), extrae texto, asigna folio automático si `settings.auto_folio=true`, aplica TRD, crea permisos por defecto (desde `role_module_access`), encola análisis IA (`ai_status=PENDING`). → `Document` (201). 503 `STORAGE_NOT_CONFIGURED` si no hay S3. |
 | GET | `/documents/:id` | `Document` completo (`tags`, `metadata`, `author`). |
 | PATCH | `/documents/:id` | `{ title?, type?, category?, subcategory?, summary?, person_id?, academic_period_id? }`. Rechaza si status no `allows_edit`. |
-| GET | `/documents/:id/download?disposition=inline\|attachment` | `{ url, expires_at }` (URL prefirmada 15 min). Registra `DOWNLOADED`/`VIEWED` en custodia según `disposition`. |
+| GET | `/documents/:id/download?disposition=inline\|attachment` | `{ url, expires_at }` (URL prefirmada 15 min). Registra `DOWNLOADED`/`VIEWED` en custodia según `disposition`. **409 `CONFLICT` si el documento está en `BLOQUEO_ADMIN`**: un bloqueo administrativo impide que el documento salga del sistema. |
 | GET | `/documents/:id/text` | `{ text, truncated }` (para chat IA; solo lectores). |
 | POST | `/documents/:id/folio` | `{ manual_folio? }` → `{ folio_index }` (auto usa `folio_counters`). |
-| POST | `/documents/:id/lock` / `/unlock` | → `Document` (BLOQUEO_ADMIN ↔ estado archivístico previo guardado en `previous_status_code`). |
+| POST | `/documents/:id/lock` / `/unlock` | → `Document` (BLOQUEO_ADMIN ↔ estado archivístico previo guardado en `previous_status_code`). **Exigen escritura sobre el documento**, igual que el resto de acciones mutadoras: 403 `FORBIDDEN` si el rol no escribe en el módulo, 404 si el documento no existe. 409 al bloquear lo ya bloqueado o desbloquear lo que no lo está. |
 | POST | `/documents/:id/approve` | `{ reason? }` → `Document` (estado `APROBADO`, guarda hash y sello en `document_approvals`; irreversible). |
-| POST | `/documents/:id/transfer` | `{ to?: 'ARCHIVO_CENTRAL'\|'ARCHIVO_HISTORICO' }` → `Document`. Aplica regla: al llegar a histórico con disposición `KEEP` → `CONSERVACION_PERMANENTE`. Notifica admin/rector. |
+| POST | `/documents/:id/transfer` | `{ to?: 'ARCHIVO_CENTRAL'\|'ARCHIVO_HISTORICO' }` → `Document`. **La secuencia archivística es obligatoria**: solo se transfiere desde un estado con `allows_edit = true` y el único destino admitido es el siguiente por `sort_order` de `document_statuses`; cualquier otro `to` responde **409 `CONFLICT`** (no se pueden saltar etapas). `APROBADO`, `BLOQUEO_ADMIN`, `ARCHIVO_HISTORICO` y `CONSERVACION_PERMANENTE` responden 409. Al salir de la fase editable se aplica la disposición de la TRD: con `KEEP` avanza al estado terminal (`CONSERVACION_PERMANENTE`). Notifica admin/rector. |
 | POST | `/documents/:id/trash` | `{ reason }` → 204. Soft delete (papelera). |
 | POST | `/documents/:id/restore` | 204 |
 | DELETE | `/documents/:id` | Admin. Solo si está en papelera. Borra S3 + BD, escribe `deletion_logs`. |
 | GET/POST/DELETE | `/documents/:id/tags`, body `{ tags: string[] }`, `DELETE /documents/:id/tags/:tag` | `string[]` |
 | GET/PUT/DELETE | `/documents/:id/metadata`, `PUT` body `{ key, value }` (upsert), `DELETE /documents/:id/metadata/:key` | `Document['metadata']` |
-| GET/POST | `/documents/:id/notes`, body `{ text }` | `DocumentNote[]` / `DocumentNote` |
+| GET/POST | `/documents/:id/notes`, body `{ text }` | `DocumentNote[]` / `DocumentNote`. El `POST` **exige escritura sobre el documento**: 403 `FORBIDDEN` para roles de solo lectura como `AUDITOR`. |
 | GET/POST | `/documents/:id/versions` (POST multipart `file`, `changes?`) | `DocumentVersion[]` / `DocumentVersion`. Archiva la versión anterior en `versions/`, actualiza `s3_key`, `sha256`, `file_size`, texto extraído; encola IA. |
-| GET | `/documents/:id/versions/:versionId/download` | `{ url, expires_at }` |
-| GET/POST/DELETE | `/documents/:id/relations`, POST `{ target_document_id, relation_type }`, `DELETE /documents/:id/relations/:relationId` | `DocumentRelation[]` |
+| GET | `/documents/:id/versions/:versionId/download` | `{ url, expires_at }`. 409 `CONFLICT` si el documento está en `BLOQUEO_ADMIN`. |
+| GET/POST/DELETE | `/documents/:id/relations`, POST `{ target_document_id, relation_type }`, `DELETE /documents/:id/relations/:relationId` | `DocumentRelation[]`. El `POST` exige escritura sobre el documento origen **y lectura sobre el destino**: 404 si el destino no existe o no es accesible. |
 | GET/PUT | `/documents/:id/permissions`, PUT `{ role_code, can_read, can_write, can_delete }` | `DocumentPermission[]` (admin) |
 | GET | `/documents/:id/custody` | `CustodyEvent[]` (admin/rector/auditor/archivista) |
 | POST | `/documents/:id/ai/analyze` | Reencola análisis → `{ ai_status }` |
@@ -132,6 +137,10 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 | POST | `/documents/:id/loans` | `{ loaned_to, expected_return_date, purpose, notes? }` → `Loan` |
 
 ## Búsqueda — `/search`
+
+> `POST /search/semantic` comprueba el motor de IA **antes** de preseleccionar candidatos: sin
+> `GEMINI_API_KEY` responde siempre 503 `AI_NOT_CONFIGURED`, también cuando el usuario no tiene
+> documentos accesibles (antes devolvía un 200 vacío engañoso).
 
 | GET | `/search/fulltext?q=&module=&page=&pageSize=` | `Paginated<Document>` (tsvector + trigram; incluye texto extraído; respeta acceso y préstamos). |
 | GET | `/search/advanced?keyword=&author=&date_from=&date_to=&module=&tag=&status=&type=&folio=&person_id=&page=` | `Paginated<Document>` |
@@ -148,25 +157,30 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 | POST | `/expedientes/:id/close` / `/reopen` (admin) / `/transfer` | → `Expediente` |
 | POST | `/expedientes/:id/respond` | `{ document_id? }` marca `responded_at`. |
 | DELETE | `/expedientes/:id` | admin/rector. Libera documentos. |
-| POST/DELETE | `/expedientes/:id/documents` `{ document_ids: string[] }` / `/expedientes/:id/documents/:documentId` | `ExpedienteDocument[]` |
+| POST/DELETE | `/expedientes/:id/documents` `{ document_ids: string[] }` / `/expedientes/:id/documents/:documentId` | `ExpedienteDocument[]`. El `POST` exige escritura en el módulo del expediente **y lectura sobre cada documento que se incluye**: 403 `FORBIDDEN` si alguno no es accesible (incluirlo concedería lectura por la regla 4). |
 | PUT | `/expedientes/:id/documents/order` | `{ document_ids: string[] }` (reordena foliación) |
 | GET | `/expedientes/:id/export?format=xlsx\|csv\|pdf` | descarga FUID del expediente. |
 
 ## Personas — `/people`
 
-| GET | `/people?type=&q=&status=&page=` | `Paginated<PersonSummary>` |
-| POST | `/people` | `Person` sin id → `Person`. Si `type_code=EMPLOYEE` crea expediente laboral automático en el módulo configurado (`settings.hr_module_code`); si `STUDENT`, expediente en `settings.academic_module_code` para el periodo actual. |
-| GET | `/people/:id` | `Person` con `completeness`. |
-| PATCH | `/people/:id` | |
-| GET | `/people/:id/expedientes` / `/people/:id/documents` | listas |
-| GET/POST | `/people/:id/events`, POST `{ event_type, title, description?, event_date, document_id? }` | `PersonEvent[]` |
+> El directorio contiene datos personales de empleados y de **estudiantes menores de edad**
+> (documento de identidad, correo, teléfono, fecha de nacimiento). **Leerlo exige lectura en
+> alguna dependencia; modificarlo exige escritura en alguna dependencia.** Una cuenta sin
+> módulos (`SIN_ASIGNAR`) recibe listas vacías y 403 en las escrituras.
+
+| GET | `/people?type=&q=&status=&page=` | `Paginated<PersonSummary>`. Sin ninguna dependencia legible devuelve **200 con `total: 0`**, igual que `GET /documents`. |
+| POST | `/people` | `Person` sin id → `Person`. **Exige escritura en alguna dependencia** (403 en otro caso). Si `type_code=EMPLOYEE` crea expediente laboral automático en el módulo configurado (`settings.hr_module_code`); si `STUDENT`, expediente en `settings.academic_module_code` para el periodo actual. |
+| GET | `/people/:id` | `Person` con `completeness`. **404** si el usuario no tiene ninguna dependencia legible. |
+| PATCH | `/people/:id` | Exige escritura en alguna dependencia (403 en otro caso). |
+| GET | `/people/:id/expedientes` / `/people/:id/documents` | listas **filtradas por los módulos que el usuario puede leer**. |
+| GET/POST | `/people/:id/events`, POST `{ event_type, title, description?, event_date, document_id? }` | `PersonEvent[]`. El `GET` exige lectura en alguna dependencia; el `POST`, escritura. |
 | GET/PUT | `/people/required-documents?type=` | `{ document_type, is_mandatory }[]` (admin edita) |
 | GET/POST/PATCH | `/academic-periods` | `AcademicPeriod` (admin) |
 
 ## TRD y categorías
 
 | GET | `/trd?module=` | `RetentionRule[]` |
-| POST/PUT/DELETE | `/trd`, `/trd/:id` | admin/archivista o escritura en el módulo. |
+| POST/PUT/DELETE | `/trd`, `/trd/:id` | admin/archivista o escritura en el módulo. Si el `PUT` cambia `module_code`, se exige el permiso **también sobre el módulo de destino** (403 en otro caso). |
 | GET | `/trd/export?format=csv\|xlsx&module=` | descarga. |
 | GET | `/categories?module=&flat=true` | `Category[]` (árbol por defecto). |
 | POST/PATCH/DELETE | `/categories`, `/categories/:id` | admin. |
@@ -208,7 +222,7 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 
 ## Estadísticas — `/stats`
 
-| GET | `/stats/dashboard` | `{ total_documents, documents_this_month, documents_by_module: {code,total}[], documents_by_status: {code,total}[], retention_alerts, pending_actions: { deletion_requests, overdue_loans, without_trd, without_folio, without_expediente }, storage: { bytes: number|null, configured: boolean }, recent_activity: AuditLog[], retention_semaphore: {module_code,total,alerts}[] }` |
+| GET | `/stats/dashboard` | `{ total_documents, documents_this_month, documents_by_module: {code,total}[], documents_by_status: {code,total}[], retention_alerts, pending_actions: { deletion_requests, overdue_loans, without_trd, without_folio, without_expediente }, storage: { bytes: number|null, configured: boolean }, recent_activity: AuditLog[] (global solo para quien puede leer `/audit` —acceso total y `AUDITOR`—; el resto recibe **únicamente sus propias acciones**), retention_semaphore: {module_code,total,alerts}[] }` |
 | GET | `/stats/general` | KPIs, TRD compliance, semáforo, préstamos, expedientes (formas del `StatsPage` actual). |
 | GET | `/stats/trends?months=12` | `{ timeline: {month,total}[], by_module_type: …, speed: …, top_types: … }` |
 | GET | `/stats/alerts` | `{ counts, ret7: Document[], overdue_loans: Loan[], pending_deletions: DeletionRequest[] }` |
@@ -244,14 +258,29 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 4. Lectura adicional: documento con préstamo `ACTIVE` al usuario; documento que pertenece a un expediente de un módulo accesible.
 5. `document_permissions` restringe además por rol dentro del documento (si existe fila para el rol con `can_read=false`, no lee aunque el módulo lo permita).
 6. Eliminación directa (purga) solo `ADMIN`/`RECTOR`; mover a papelera requiere escritura en el módulo; estados `CONSERVACION_PERMANENTE`, `APROBADO` y `BLOQUEO_ADMIN` no se eliminan ni editan.
+7. **Toda acción que muta un documento exige escritura sobre él** (módulo + `document_permissions`), incluidas bloquear, desbloquear y anotar. Ninguna mutación se ejecuta antes de comprobar el permiso.
+8. **Incluir un documento en un expediente exige poder leerlo.** La regla 4 concede lectura por expediente, así que sin esta condición sería una escalada de privilegios.
+9. Los datos transversales que no cuelgan de un módulo (**directorio de personas** y sus eventos) exigen el permiso correspondiente en **al menos un** módulo.
+10. La **auditoría** —incluida `recent_activity` del tablero— solo se muestra completa a `roles.has_full_access` y `AUDITOR`.
+11. **Gobierno**: el sistema conserva siempre al menos un usuario activo con acceso total; nadie se degrada ni se desactiva a sí mismo y la cuenta administradora fundacional está protegida.
 
 ## Estados de documento (catálogo semilla)
 
 `ARCHIVO_GESTION` (edit) → `ARCHIVO_CENTRAL` (edit) → `ARCHIVO_HISTORICO` (no edit) → `CONSERVACION_PERMANENTE` (terminal). Transversales: `BLOQUEO_ADMIN` (no edit, reversible), `APROBADO` (no edit, terminal). `previous_status_code` guarda el estado archivístico al bloquear/aprobar.
 
+La secuencia **no está escrita en el código**: el servidor la deriva del catálogo
+`document_statuses`. Se transfiere desde un estado si `allows_edit = true`, y el destino es el
+siguiente por `sort_order`; la disposición `KEEP` lleva al primer estado `is_terminal` posterior.
+Cambiar `sort_order`, `allows_edit` o `is_terminal` con `PUT /catalogs/document-statuses/:code`
+cambia la máquina de estados sin tocar el servidor.
+
+`retention_end_date` es una fecha civil ISO `YYYY-MM-DD` = **fecha UTC de `created_at`** +
+`retention_rules.retention_years`. No depende de la zona horaria del servidor, de modo que el
+cliente puede recalcularla a partir del `created_at` que recibe.
+
 ## Variables de entorno
 
-Servidor (`server/.env`): `PORT=4000`, `DATABASE_URL=postgres://postgres:1004@localhost:5432/eduarchive`, `DATABASE_URL_TEST`, `JWT_SECRET`, `JWT_ACCESS_TTL=15m`, `REFRESH_TTL_DAYS=14`, `APP_ENCRYPTION_KEY` (32 bytes base64), `CORS_ORIGINS=http://localhost:3000`, `GEMINI_API_KEY` (opcional), `GEMINI_MODEL=gemini-2.0-flash`, `SMTP_*` (opcional; también configurable en BD), `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`, `LOG_LEVEL`, `NODE_ENV`.
+Servidor (`server/.env`): `PORT=4000`, `DATABASE_URL=postgres://postgres:CONTRASENA@localhost:5432/eduarchive`, `DATABASE_URL_TEST`, `JWT_SECRET`, `JWT_ACCESS_TTL=15m`, `REFRESH_TTL_DAYS=14`, `APP_ENCRYPTION_KEY` (32 bytes base64), `CORS_ORIGINS=http://localhost:3000`, `GEMINI_API_KEY` (opcional), `GEMINI_MODEL=gemini-2.0-flash`, `SMTP_*` (opcional; también configurable en BD), `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`, `LOG_LEVEL`, `NODE_ENV`.
 Cliente (`.env.local`): `VITE_API_URL=http://localhost:4000/api`.
 
 ---
@@ -360,3 +389,221 @@ type AiOcrResult = {
 - Corrección de datos: los documentos cuyo resumen era el texto de error heredado
   (`"Error al analizar documento con IA."`) pasan a `ai_status = 'FAILED'` con `summary = NULL`
   y el motivo en `ai_error`.
+
+
+---
+
+## Características por rol, usuarios y contraseñas
+
+> Implementa `docs/PERMISOS_Y_USUARIOS.md`. Migración `014_features_passwords.sql`,
+> semilla `009_features.sql`. **73 características** repartidas en **12 categorías**,
+> con la matriz `9 roles × 73 características = 657 filas` sembrada explícitamente.
+
+### Tipos
+
+```ts
+type Feature = { code: string; name: string; description: string|null; category_code: string; is_core: boolean; is_sensitive: boolean; sort_order: number };
+type FeatureCategory = { code: string; name: string; description: string|null; sort_order: number };
+type RoleFeature = { role_code: string; feature_code: string; enabled: boolean; updated_at: string };
+type PasswordPolicy = {
+  min_length: number; require_upper: boolean; require_lower: boolean; require_digit: boolean; require_symbol: boolean;
+  max_attempts: number; lockout_minutes: number; expiry_days: number|null; history_count: number; temporary_ttl_hours: number;
+};
+```
+
+### Rutas de características
+
+| Método | Ruta | Detalle |
+|---|---|---|
+| GET | `/features` | `{ categories: FeatureCategory[], features: Feature[] }`. Cualquier usuario autenticado. |
+| GET | `/features/matrix` | `RoleFeature[]` completa (657 filas). Requiere `FEATURE_MATRIX_MANAGE`. |
+| PUT | `/features/matrix` | `{ role_code, feature_code, enabled }` → **204**. Rechaza **409 `CORE_FEATURE`** al desactivar una característica núcleo en un rol con `has_full_access`. |
+| PUT | `/features/matrix/bulk` | `{ role_code, features: { code, enabled }[] }` → **204**. Para activar o apagar una categoría entera. |
+| POST | `/features/matrix/reset` | `{ role_code? }` → **204**. Restaura los valores de la semilla (`role_feature_defaults`). Sin `role_code`, toda la matriz. |
+
+### Cambios en rutas existentes
+
+- **`GET /auth/me`** añade `effective_features: string[]`, `phone`, `position` y `password_expires_at`.
+- **`GET /catalogs`** añade `features: Feature[]` y `feature_categories: FeatureCategory[]`.
+- **Toda ruta mutadora** queda protegida por `requireFeature(...)`. El rechazo es
+  **403 `FEATURE_DISABLED`** con `details.feature` = código de la característica.
+  La comprobación se **suma** a las de módulo y de documento, no las sustituye: cuando
+  el módulo ya lo impedía, el error sigue siendo `403 FORBIDDEN` / `404 NOT_FOUND`.
+- Rutas de solo lectura que ya estaban restringidas y ahora además exigen su característica:
+  `GET /audit` y `/audit/actions` (`AUDIT_VIEW`), `GET /audit/export` (`AUDIT_EXPORT`),
+  `GET /custody` y `GET /documents/:id/custody` (`CUSTODY_VIEW`), `GET /ai/usage`
+  (`AI_USAGE_VIEW`), `GET /system/config` y `/system/jobs` (`SYSTEM_CONFIG_VIEW`),
+  `GET /users*` (`USER_VIEW`) y las descargas de documento y de versión (`DOCUMENT_DOWNLOAD`).
+
+### Reparto por defecto de la semilla
+
+| Rol | Habilitadas | Criterio |
+|---|---|---|
+| `ADMIN`, `RECTOR` | 73 / 73 | Acceso total. |
+| `ARCHIVISTA` | 46 / 73 | Todo lo que hoy le permite la escritura por módulo, más `CUSTODY_VIEW`. |
+| `DOCENTE`, `ADMINISTRATIVO`, `RRHH`, `CONTADOR` | 45 / 73 | Lo que hoy les permite la escritura por módulo. |
+| `AUDITOR` | 21 / 73 | Solo lectura y auditoría. |
+| `SIN_ASIGNAR` | 0 / 73 | Nada. |
+
+Núcleo (`is_core`, no se pueden apagar en un rol de acceso total): `USER_MANAGE`,
+`ROLE_MANAGE`, `ACCESS_MATRIX_MANAGE`, `FEATURE_MATRIX_MANAGE`, `SYSTEM_CONFIG_EDIT`.
+
+### Usuarios, perfiles y contraseñas
+
+| Método | Ruta | Detalle |
+|---|---|---|
+| GET | `/users` | Añade `last_login_at`, `password_expires_at`, `active_sessions`, `password_status` (`VIGENTE`\|`POR_VENCER`\|`VENCIDA`\|`TEMPORAL`) e `is_locked`. **No** publica `failed_attempts` ni `locked_until` (ver `server/CONTRACT_NOTES.md` §10). |
+| GET | `/users/:id` | Todo lo anterior **más** `failed_attempts` y `locked_until`. |
+| POST | `/users` | Genera la contraseña temporal **según la política** si no se envía. Devuelve `temporary_password` y `temporary_password_expires_at` solo en esta respuesta. Acepta `phone` y `position`. |
+| PATCH | `/users/:id` | Acepta además `phone` y `position`. |
+| POST | `/users/:id/reset-password` | `{ temporary_password, password_expires_at }`. Vigencia `temporary_ttl_hours`; revoca sesiones. |
+| POST | `/users/:id/unlock` | Limpia `failed_attempts` y `locked_until`. Devuelve el `User`. |
+| POST | `/users/:id/force-password-change` | Marca `must_change_password`. Devuelve el `User`. |
+| GET | `/users/:id/activity` | `Paginated<AuditLog>` con las últimas acciones del usuario. |
+| GET/PATCH | `/me/profile` | El propio usuario. El `GET` devuelve además `role`, `effective_modules`, `effective_features` y `sessions`. El `PATCH` acepta `full_name`, `phone`, `position` y `avatar_url`. |
+| GET/PUT | `/system/password-policy` | Lee y edita la política. `GET` requiere `SYSTEM_CONFIG_VIEW`; `PUT`, `SYSTEM_CONFIG_EDIT`. |
+
+**Reglas de contraseña**
+
+- Composición y longitud según la política (`min_length`, `require_upper`, `require_lower`,
+  `require_digit`, `require_symbol`) → **422 `VALIDATION_ERROR`** con el detalle en el mensaje.
+- Reutilizar una de las últimas `history_count` contraseñas → **422 `PASSWORD_REUSED`**
+  (`details.history_count`). Con `history_count = 0` (valor sembrado) no hay historial.
+- `expiry_days` fija `password_expires_at`. Al vencer, `POST /auth/login` responde **200**
+  con `user.must_change_password = true`: una contraseña vencida nunca cierra la puerta.
+- El bloqueo por intentos lee `max_attempts` y `lockout_minutes` de la misma política.
+
+---
+
+## Panel comercial: clientes, cotizaciones, facturas, pagos y licencias
+
+> Implementa `docs/FACTURACION.md`. Migración `015_billing.sql`, semilla `010_billing.sql`.
+>
+> **Límite explícito: esto NO es facturación electrónica ante la DIAN.** El sistema numera y
+> registra documentos comerciales, calcula impuestos y genera PDF. `Invoice.cufe` queda
+> preparado y siempre **`null`**. Ninguna respuesta ni PDF afirma validez tributaria.
+
+Todas las rutas exigen sesión y **`BILLING_VIEW`**; las mutadoras exigen además
+`CLIENT_MANAGE`, `QUOTE_MANAGE`, `INVOICE_MANAGE`, `PAYMENT_MANAGE` o `LICENSE_MANAGE`.
+
+### Tipos
+
+```ts
+type Client = { id: string; name: string; legal_name: string|null; document_type: string; document_number: string|null;
+  tax_regime: string|null; address: string|null; city: string|null; state: string|null; country: string;
+  contact_name: string|null; contact_email: string|null; contact_phone: string|null;
+  status: 'PROSPECT'|'ACTIVE'|'SUSPENDED'|'FORMER'; notes: string|null; created_by: string|null; created_at: string; updated_at: string };
+
+type LicensePlan = { code: string; name: string; description: string|null;
+  billing_period: 'MONTHLY'|'ANNUAL'|'CUSTOM'; price_amount: number|null; currency: string;
+  storage_gb: number|null; max_users: number|null; features: string[]; is_active: boolean; sort_order: number };
+
+type License = { id: string; client_id: string; plan_code: string; start_date: string; end_date: string|null;
+  status: 'ACTIVE'|'EXPIRED'|'SUSPENDED'|'CANCELLED'; seats: number|null; storage_gb: number|null;
+  price_amount: number|null; currency: string; auto_renew: boolean; notes: string|null };
+
+type CommercialItem = { id: string; position: number; description: string; plan_code: string|null;
+  quantity: number; unit_price: number; total: number };
+
+type Quote = { id: string; client_id: string; client_name: string; number: string;      // COT-2026-0001
+  issue_date: string; valid_until: string|null; status: 'DRAFT'|'SENT'|'ACCEPTED'|'REJECTED'|'EXPIRED';
+  currency: string; subtotal: number; tax_rate: number; tax_amount: number; total: number;
+  notes: string|null; terms: string|null; decision_reason: string|null;
+  sent_at: string|null; decided_at: string|null; items: CommercialItem[];
+  invoice_id: string|null; invoice_number: string|null };
+
+type Invoice = { id: string; client_id: string; client_name: string; quote_id: string|null; license_id: string|null;
+  number: string|null;                                                                   // FAC-2026-0001, null en borrador
+  issue_date: string; due_date: string|null;
+  status: 'DRAFT'|'ISSUED'|'PARTIAL'|'PAID'|'OVERDUE'|'VOID';
+  currency: string; subtotal: number; tax_rate: number; tax_amount: number; total: number;
+  paid_amount: number; balance: number; cufe: null; notes: string|null;
+  issued_at: string|null; voided_at: string|null; void_reason: string|null;
+  items: CommercialItem[]; payments: Payment[] };
+
+type Payment = { id: string; invoice_id: string; client_id: string; payment_date: string; amount: number; currency: string;
+  method: 'TRANSFER'|'PSE'|'CASH'|'CHECK'|'CARD'|'OTHER'; reference: string|null; notes: string|null;
+  reversed_at: string|null; reversed_by: string|null; reversal_reason: string|null; registered_by: string|null; created_at: string };
+```
+
+### Rutas
+
+| Método | Ruta | Característica | Detalle |
+|---|---|---|---|
+| GET | `/clients?status=&q=&page=&pageSize=` | `BILLING_VIEW` | `Paginated<Client>` |
+| POST | `/clients` | `CLIENT_MANAGE` | **201** `Client` |
+| GET | `/clients/:id` | `BILLING_VIEW` | `Client` |
+| PATCH | `/clients/:id` | `CLIENT_MANAGE` | `Client` |
+| GET | `/clients/:id/summary` | `BILLING_VIEW` | `{ client, active_license, licenses[], totals: { invoiced, paid, balance, overdue }, last_quotes[], last_invoices[], last_payments[] }` |
+| GET | `/license-plans` · `/license-plans/:code` | `BILLING_VIEW` | `LicensePlan[]` / `LicensePlan` |
+| POST | `/license-plans` · PATCH `/license-plans/:code` | `LICENSE_MANAGE` | Alta y edición del catálogo de planes |
+| GET | `/licenses?client_id=&status=` | `BILLING_VIEW` | `Paginated<License>` con `client_name` y `plan_name` |
+| GET | `/licenses/expiring?days=60` | `BILLING_VIEW` | `License[]` por vencer |
+| POST | `/licenses` · PATCH `/licenses/:id` | `LICENSE_MANAGE` | Contratación y edición |
+| POST | `/licenses/:id/renew` | `LICENSE_MANAGE` | Prorroga un periodo del plan desde el día siguiente a `end_date`. **409** si el plan es `CUSTOM` o no hay `end_date`. |
+| GET | `/quotes?client_id=&status=` | `BILLING_VIEW` | `Paginated<Quote>` |
+| POST | `/quotes` | `QUOTE_MANAGE` | `{ client_id, items[], ... }` → **201** `Quote` con consecutivo `COT-AAAA-NNNN` |
+| GET | `/quotes/:id` | `BILLING_VIEW` | `Quote` con `items` |
+| PATCH | `/quotes/:id` | `QUOTE_MANAGE` | Cabecera y/o `items` completos. **409** si ya está `ACCEPTED`, `REJECTED` o `EXPIRED`. |
+| POST | `/quotes/:id/status` | `QUOTE_MANAGE` | `{ status, notes? }`. Transiciones: `DRAFT→SENT\|REJECTED\|EXPIRED`, `SENT→ACCEPTED\|REJECTED\|EXPIRED`; los tres finales son terminales (**409**). `REJECTED` exige `notes` (**400**) y lo guarda en `decision_reason`. |
+| POST | `/quotes/:id/convert` | `INVOICE_MANAGE` | **201** `Invoice` en `DRAFT` con las líneas copiadas y `quote_id`. **409** si la cotización no está `ACCEPTED` o ya se convirtió. |
+| GET | `/quotes/:id/pdf` | `BILLING_VIEW` | **Descarga directa** `application/pdf` |
+| GET | `/invoices?client_id=&status=&from=&to=` | `BILLING_VIEW` | `Paginated<Invoice>` |
+| POST | `/invoices` · PATCH `/invoices/:id` | `INVOICE_MANAGE` | Alta y edición (cabecera y/o `items`). **409** si la factura está `PAID` o `VOID`. |
+| GET | `/invoices/:id` | `BILLING_VIEW` | `Invoice` con `items` y `payments` |
+| POST | `/invoices/:id/issue` | `INVOICE_MANAGE` | Asigna `FAC-AAAA-NNNN`, fija `issued_at` y pasa a `ISSUED`. **409** si no está en `DRAFT` o si `total = 0`. |
+| POST | `/invoices/:id/void` | `INVOICE_MANAGE` | `{ reason }` (obligatorio, **400** si falta). Pasa a `VOID` **conservando el consecutivo**. |
+| GET | `/invoices/:id/pdf` | `BILLING_VIEW` | **Descarga directa** `application/pdf` |
+| GET | `/payments?client_id=&invoice_id=&from=&to=` | `BILLING_VIEW` | `Paginated<Payment>` |
+| POST | `/payments` | `PAYMENT_MANAGE` | **201** `{ payment, invoice }`. **409** si la factura está en `DRAFT`, `PAID` o `VOID`, o si el importe supera el saldo. |
+| DELETE | `/payments/:id` | `PAYMENT_MANAGE` | **Revierte**, no borra: `{ reason }` en el cuerpo (o `?reason=`). Devuelve `{ payment, invoice }`. **400** sin motivo, **409** si ya estaba revertido. |
+| GET | `/billing/stats?from=&to=` | `BILLING_VIEW` | `{ from, to, invoiced_by_month[], collected_by_month[], outstanding, overdue, by_plan[], top_clients[], expiring_licenses[] }` |
+| GET | `/billing/my-account` | `BILLING_VIEW` | Vista de solo lectura de la propia institución: `{ client, active_license, licenses[], totals, invoices[], payments[] }`. **404** si no hay cliente asociado. |
+
+### Reglas de consistencia
+
+1. **Consecutivos**: `commercial_counters(kind, year, last_value)` con `UPDATE … RETURNING`
+   (`next_commercial_number('COT'|'FAC')`), igual que los folios. Sin colisiones bajo
+   concurrencia. La cotización se numera al **crearse**; la factura, al **emitirse**.
+2. **Saldo y estado**: el disparador `trg_payments_recalc` llama a `recalc_invoice_balance()`
+   en cada alta, cambio o baja de `payments` y recalcula `paid_amount`, `balance` y el estado
+   (`ISSUED` → `PARTIAL` → `PAID`). `DRAFT` y `VOID` no cambian de estado por los pagos.
+3. **`OVERDUE`** lo fija el trabajo diario `mark_overdue_invoices` (cron `40 0 * * *`,
+   editable en `system_config.jobs`; también `POST /system/jobs/mark_overdue_invoices/run`).
+4. **Nada se borra**: la cotización rechazada guarda `decision_reason`, la factura anulada
+   guarda `void_reason` y su consecutivo, y el pago revertido guarda `reversed_at`,
+   `reversed_by` y `reversal_reason` y deja de contar para el saldo.
+5. **Importes**: columnas `NUMERIC(14,2)`. El redondeo es explícito y en este orden:
+   línea `round(cantidad × precio, 2)` → subtotal `round(Σ líneas, 2)` →
+   impuesto `round(subtotal × tasa / 100, 2)` → total `subtotal + impuesto`. Todo se calcula
+   en SQL; el servidor nunca suma dinero en coma flotante.
+6. **Fechas civiles** (`issue_date`, `due_date`, `valid_until`, `start_date`, `end_date`,
+   `payment_date`) se devuelven como `YYYY-MM-DD`.
+
+### Configuración (`system_config.billing`, editable por `PUT /system/config/billing`)
+
+| Clave | Por defecto | Para qué |
+|---|---|---|
+| `currency` | `"COP"` | Moneda por defecto de cotizaciones, facturas y licencias. |
+| `tax_rate` / `tax_name` | `19` / `"IVA"` | Impuesto por defecto y su nombre en el PDF. |
+| `payment_terms_days` | `30` | Plazo de pago: `due_date = issue_date + N`. |
+| `quote_validity_days` | `30` | Vigencia por defecto de una cotización. |
+| `issuer` | datos de EduArchive | Emisor del PDF: nombre, NIT, dirección, correo, teléfono, web y `bank_details`. |
+| `quote_terms` / `invoice_notes` | texto sembrado | Pie de la cotización y de la factura. |
+| `my_client_id` | *(sin definir)* | Cliente que representa a la institución en `GET /billing/my-account`. Si falta, se resuelve por coincidencia con `institution_name`. |
+
+### Planes sembrados
+
+| Código | Nombre | Periodo | Precio | Almacenamiento | Usuarios |
+|---|---|---|---|---|---|
+| `MENSUAL_INSTITUCIONAL` | Mensual Institucional | `MONTHLY` | 1.700.000 COP | 500 GB | 25 |
+| `ANUAL_PREMIUM` | Anual Premium | `ANNUAL` | 10.000.000 COP | 1 TB (1024 GB) | ilimitados (`null`) |
+| `RED_EDUCATIVA` | Red Educativa | `CUSTOM` | a la medida (`null`) | `null` | `null` |
+
+### Códigos de error nuevos
+
+| Código | HTTP | Cuándo |
+|---|---|---|
+| `FEATURE_DISABLED` | 403 | La característica está desactivada para el rol. `details.feature`. |
+| `CORE_FEATURE` | 409 | Se intentó desactivar una característica núcleo en un rol de acceso total. |
+| `PASSWORD_REUSED` | 422 | La contraseña nueva está en el historial reciente. |

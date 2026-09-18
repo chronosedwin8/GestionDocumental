@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import * as loansApi from '@/api/loans';
 import * as statsApi from '@/api/stats';
+import { useFeature } from '@/hooks/useFeature';
 import { useQuery } from '@/hooks/useQuery';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCatalogs } from '@/contexts/CatalogContext';
@@ -37,6 +38,8 @@ const DUE_SOON_DAYS = 7;
 
 export default function DashboardPage(): React.JSX.Element {
   const { user, isAdminArea } = useAuth();
+  // Quien no puede auditar solo recibe sus propias acciones en el tablero.
+  const canViewAudit = useFeature('AUDIT_VIEW');
   const { activeModules, moduleColor, moduleLabel, statusLabel, statusColor, settings } = useCatalogs();
 
   const stats = useQuery('stats:dashboard', (signal) => statsApi.dashboard(signal));
@@ -238,8 +241,15 @@ export default function DashboardPage(): React.JSX.Element {
                 <Activity className="h-4 w-4 text-acid" aria-hidden />
                 Últimas actividades
               </h2>
+              {/* `recent_activity` es global solo para acceso total y AUDITOR;
+                  el resto ve solo sus propias acciones y un usuario nuevo la
+                  recibe vacía (CONTRACT_NOTES §9). No es un fallo. */}
               {data.recent_activity.length === 0 ? (
-                <p className="text-sm text-content-muted">Sin actividad reciente.</p>
+                <p className="text-sm text-content-muted">
+                  {canViewAudit
+                    ? 'Todavía no hay acciones registradas en el sistema.'
+                    : 'Aquí aparecerán tus propias acciones. El historial completo del sistema solo lo ve quien tiene permiso de auditoría.'}
+                </p>
               ) : (
                 <ul className="space-y-2">
                   {data.recent_activity.slice(0, 8).map((log) => (

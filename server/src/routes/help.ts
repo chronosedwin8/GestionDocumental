@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { deleteHelpArticle, getHelpArticle, listHelpArticles, upsertHelpArticle } from '../services/help.js';
@@ -32,7 +32,7 @@ const articleSchema = z.object({
   sort_order: z.number().int().optional(),
 });
 
-helpRouter.post('/', requireFullAccess, validateBody(articleSchema), async (req: Request, res: Response) => {
+helpRouter.post('/', requireFullAccess, requireFeature('HELP_EDIT'), validateBody(articleSchema), async (req: Request, res: Response) => {
   const article = await upsertHelpArticle(req.body as z.infer<typeof articleSchema>);
   await audit(req, 'UPSERT_HELP_ARTICLE', 'help_article', article.slug, {});
   res.status(201).json(article);
@@ -41,6 +41,7 @@ helpRouter.post('/', requireFullAccess, validateBody(articleSchema), async (req:
 helpRouter.patch(
   '/:slug',
   requireFullAccess,
+  requireFeature('HELP_EDIT'),
   validateBody(articleSchema.partial({ slug: true, title: true, body_md: true })),
   async (req: Request, res: Response) => {
     const current = await getHelpArticle(param(req, 'slug'));
@@ -58,7 +59,7 @@ helpRouter.patch(
   },
 );
 
-helpRouter.delete('/:slug', requireFullAccess, async (req: Request, res: Response) => {
+helpRouter.delete('/:slug', requireFullAccess, requireFeature('HELP_EDIT'), async (req: Request, res: Response) => {
   await deleteHelpArticle(param(req, 'slug'));
   await audit(req, 'DELETE_HELP_ARTICLE', 'help_article', param(req, 'slug'), {});
   res.status(204).end();

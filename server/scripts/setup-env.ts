@@ -51,6 +51,22 @@ function value(key: string, fallback: () => string, secret = false): string {
   return created;
 }
 
+/**
+ * Cadena de conexión a la base local.
+ *
+ * El usuario y la contraseña salen del entorno (`PGUSER`, `PGPASSWORD`, `PGHOST`,
+ * `PGPORT`), como haría `psql`. Si no hay contraseña se deja el marcador
+ * `CONTRASENA` para que quien instale la complete: es preferible un arranque
+ * que falla con un mensaje claro a una credencial escrita en el repositorio.
+ */
+function databaseUrl(database: string): string {
+  const user = process.env.PGUSER ?? 'postgres';
+  const password = process.env.PGPASSWORD ?? 'CONTRASENA';
+  const host = process.env.PGHOST ?? 'localhost';
+  const port = process.env.PGPORT ?? '5432';
+  return `postgres://${user}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+}
+
 const adminPassword = value('SEED_ADMIN_PASSWORD', () => strongPassword(20), true);
 const isNewAdminPassword = generated.includes('SEED_ADMIN_PASSWORD');
 
@@ -60,8 +76,10 @@ const values: Record<string, string> = {
   LOG_LEVEL: value('LOG_LEVEL', () => 'info'),
   CORS_ORIGINS: value('CORS_ORIGINS', () => 'http://localhost:3000,http://localhost:5173'),
 
-  DATABASE_URL: value('DATABASE_URL', () => 'postgres://postgres:1004@localhost:5432/eduarchive'),
-  DATABASE_URL_TEST: value('DATABASE_URL_TEST', () => 'postgres://postgres:1004@localhost:5432/eduarchive_test'),
+  // La contraseña de PostgreSQL se toma del entorno (PGPASSWORD o DATABASE_URL).
+  // Nunca se escribe una contraseña real en el código, que es público.
+  DATABASE_URL: value('DATABASE_URL', () => databaseUrl('eduarchive')),
+  DATABASE_URL_TEST: value('DATABASE_URL_TEST', () => databaseUrl('eduarchive_test')),
 
   JWT_SECRET: value('JWT_SECRET', () => crypto.randomBytes(48).toString('base64'), true),
   JWT_ACCESS_TTL: value('JWT_ACCESS_TTL', () => '15m'),

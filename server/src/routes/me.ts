@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { many, query } from '../db/pool.js';
 import { currentUser, requireAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
-import { documentAccessClause } from '../services/access.js';
+import { documentAccessClause, getEffectiveModules } from '../services/access.js';
+import { effectiveFeatures } from '../services/features.js';
+import { getOwnProfile, updateOwnProfile } from '../services/users.js';
+import { listSessions } from '../services/auth.js';
+import { audit } from '../services/audit.js';
 import { param } from '../lib/params.js';
 
 export const meRouter = Router();
@@ -64,4 +68,43 @@ meRouter.get('/recent', async (req: Request, res: Response) => {
       params,
     ),
   );
+});
+
+
+// ── Mi perfil ───────────────────────────────────────
+
+/**
+ * Perfil propio: cualquier usuario autenticado, sin característica de por
+ * medio. Devuelve también sus dependencias, sus características habilitadas y
+ * sus sesiones activas, que es lo que muestra la pestaña «Mi perfil».
+ */
+meRouter.get('/profile', async (req: Request, res: Response) => {
+  const user = currentUser(req);
+  const [profile, modules, features, sessions] = await Promise.all([
+    getOwnProfile(user.id),
+    getEffectiveModules(user),
+    effectiveFeatures(user),
+    listSessions(user.id),
+  ]);
+  res.json({
+    ...profile,
+    role: user.role,
+    effective_modules: modules,
+    effective_features: features,
+    sessions,
+  });
+});
+
+const profileSchema = z.object({
+  full_name: z.string().min(3).optional(),
+  phone: z.string().nullable().optional(),
+  position: z.string().nullable().optional(),
+  avatar_url: z.string().nullable().optional(),
+});
+
+meRouter.patch('/profile', validateBody(profileSchema), async (req: Request, res: Response) => {
+  const user = currentUser(req);
+  const profile = await updateOwnProfile(user.id, req.body as z.infer<typeof profileSchema>);
+  await audit(req, 'UPDATE_OWN_PROFILE', 'user', user.id, req.body as Record<string, unknown>);
+  res.json(profile);
 });

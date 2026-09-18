@@ -17,6 +17,7 @@ import {
   signAccessToken,
 } from '../services/auth.js';
 import { getEffectiveModules, type AuthUser } from '../services/access.js';
+import { effectiveFeatures } from '../services/features.js';
 import { audit, clientIp, userAgent } from '../services/audit.js';
 import { findUserByEmail } from '../services/users.js';
 import { query } from '../db/pool.js';
@@ -44,7 +45,7 @@ function clearRefreshCookie(res: Response): void {
 }
 
 export async function buildMe(user: AuthUser): Promise<Record<string, unknown>> {
-  const effective = await getEffectiveModules(user);
+  const [effective, features] = await Promise.all([getEffectiveModules(user), effectiveFeatures(user)]);
   return {
     id: user.id,
     email: user.email,
@@ -60,6 +61,10 @@ export async function buildMe(user: AuthUser): Promise<Record<string, unknown>> 
     created_at: user.created_at,
     updated_at: user.updated_at,
     effective_modules: effective,
+    effective_features: features,
+    phone: user.phone,
+    position: user.position,
+    password_expires_at: user.password_expires_at,
     role: user.role,
   };
 }

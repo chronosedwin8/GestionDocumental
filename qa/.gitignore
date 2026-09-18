@@ -1,0 +1,4 @@
+.qa-state.json
+.qa-matrix.jsonl
+.qa-defects.jsonl
+node_modules/

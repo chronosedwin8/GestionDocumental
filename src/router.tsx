@@ -22,6 +22,9 @@ const TrashPage = lazy(() => import('@/features/trash/TrashPage'));
 const NotificationsPage = lazy(() => import('@/features/notifications/NotificationsPage'));
 const StatsPage = lazy(() => import('@/features/stats/StatsPage'));
 const AdminPage = lazy(() => import('@/features/admin/AdminPage'));
+const ProfilePage = lazy(() => import('@/features/profile/ProfilePage'));
+const BillingPage = lazy(() => import('@/features/billing/BillingPage'));
+const MyAccountPage = lazy(() => import('@/features/billing/MyAccountPage'));
 
 /** Exige sesión válida y fuerza el cambio de contraseña cuando corresponde. */
 function RequireAuth(): React.JSX.Element {
@@ -95,6 +98,12 @@ export const router = createBrowserRouter([
               { path: 'papelera', element: <TrashPage /> },
               { path: 'notificaciones', element: <NotificationsPage /> },
               { path: 'estadisticas', element: <StatsPage /> },
+              { path: 'mi-perfil', element: <ProfilePage /> },
+              // La sección comercial comprueba `BILLING_VIEW` dentro de la
+              // página: la ruta existe siempre y explica por qué no se ve.
+              { path: 'comercial', element: <BillingPage /> },
+              { path: 'comercial/:tab', element: <BillingPage /> },
+              { path: 'mi-cuenta', element: <MyAccountPage /> },
               {
                 element: <RequireAdmin />,
                 children: [

@@ -1,0 +1,22 @@
+{
+  "name": "eduarchive-qa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Batería de pruebas de extremo a extremo (caja negra) contra la API real de EduArchive SGDEA",
+  "scripts": {
+    "db:prepare": "tsx scripts/boot.mjs scripts/migrate.ts",
+    "server:start": "tsx scripts/boot.mjs ../server/src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cleanup": "tsx scripts/boot.mjs scripts/cleanup.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "pg": "^8.16.3",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

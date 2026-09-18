@@ -75,13 +75,16 @@ se guardan cifrados y se devuelven enmascarados.
 
 ```
 server/
-  db/migrations/     001_extensions … 012_ai_engine     (SQL puro, idempotente)
-  db/seeds/          catálogos, matriz, config, TRD, categorías, ayuda, config de IA
+  db/migrations/     001_extensions … 015_billing        (SQL puro, idempotente)
+  db/seeds/          catálogos, matriz de dependencias, config, TRD, categorías, ayuda,
+                     config de IA, catálogo de características y matriz por rol, planes
+                     y configuración comercial
   src/
     index.ts app.ts
     config/env.ts            validación zod de process.env
     db/{pool,migrate,seed}.ts
     middleware/{auth,authorize,errorHandler,requestId,validate}.ts
+                             `authorize` incluye `requireFeature(code)`
     services/…               access, auth, users, catalogs, documents, storage,
                              extraction, search, expedientes, people, trd, categories,
                              loans, notifications, deletion, trash, audit, custody,
@@ -90,12 +93,15 @@ server/
                              ai (analyze/classify/extract/ocr/semantic/chat),
                              aiCatalog (TRD, series, etiquetas, campos),
                              aiText (troceado, relevancia, etiquetas, citas),
-                             aiDocuments (cola, OCR, metadatos, reproceso, salud)
+                             aiDocuments (cola, OCR, metadatos, reproceso, salud),
+                             features (catálogo, matriz por rol, características efectivas),
+                             billing (clientes, planes, licencias, cotizaciones,
+                             facturas, pagos, estadísticas y cuenta propia)
     routes/…                 una por dominio, montadas en /api
     jobs/…                   markOverdueLoans, retentionAlerts, processDispositions,
-                             purgeTrash, refreshStats
-    lib/…                    crypto, errors, pagination, sse, pdfActa, mailer,
-                             exporters, logger, params
+                             purgeTrash, refreshStats, markOverdueInvoices
+    lib/…                    crypto, errors, pagination, sse, pdfActa, pdfCommercial,
+                             mailer, exporters, logger, params
   scripts/           setup-env.ts, db-reset.ts, test-setup.ts
   tests/             vitest + supertest contra eduarchive_test
 ```
@@ -110,8 +116,27 @@ server/
   `documentAccessClause`) con la semántica del contrato: acceso total por rol →
   `users.allowed_modules` → `role_module_access`; lectura adicional por préstamo activo y
   por expediente accesible; `document_permissions` restringe por rol.
-- **Folios y radicados sin colisión**: `folio_counters` / `radicado_counters` con
-  `UPDATE … RETURNING` (probado con 20 asignaciones concurrentes).
+- **Características por rol** (`docs/PERMISOS_Y_USUARIOS.md`): catálogo de **73
+  características** en 12 categorías y matriz `role_features` sembrada **explícitamente**
+  con las 657 combinaciones. `requireFeature(code)` protege las rutas mutadoras y **se suma**
+  a las comprobaciones de módulo y de documento: nunca las sustituye. Las características
+  `is_core` no se pueden desactivar en un rol con `has_full_access` —lo impiden la base
+  (trigger), la API (409 `CORE_FEATURE`) y la resolución de características efectivas—, de
+  modo que nadie puede dejar al sistema sin quien lo administre.
+- **Contraseñas**: política editable en `system_config.password_policy` (composición,
+  bloqueo, caducidad, historial y vigencia de la temporal). Todo cambio pasa por
+  `applyNewPassword()`, que guarda la anterior en `password_history`, recorta el historial y
+  fija `password_changed_at` / `password_expires_at`. Una contraseña vencida no cierra la
+  puerta: el inicio de sesión responde 200 con `must_change_password = true`.
+- **Panel comercial** (`docs/FACTURACION.md`): clientes, planes, licencias, cotizaciones,
+  facturas, pagos y estadísticas. Importes en `NUMERIC(14,2)` con redondeo explícito en SQL,
+  consecutivos `COT-/FAC-` por año con `UPDATE … RETURNING`, disparador que recalcula
+  `paid_amount`/`balance`/estado, trabajo diario que marca las vencidas y PDF con la misma
+  librería que las actas. **No es facturación electrónica ante la DIAN** y en ningún sitio
+  se insinúa; `invoices.cufe` queda preparado y vacío.
+- **Folios, radicados y consecutivos comerciales sin colisión**: `folio_counters`,
+  `radicado_counters` y `commercial_counters` con `UPDATE … RETURNING` (probado con 20
+  asignaciones concurrentes de cada uno).
 - **Búsqueda**: `search_vector` en español con `unaccent` y pesos
   título/folio **A**, resumen/etiquetas **B**, tipo/categoría/metadatos **C**,
   texto extraído **D**; índices GIN y trigram; paginación real con `total`.

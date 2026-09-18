@@ -20,6 +20,10 @@ export type AuthUser = {
   must_change_password: boolean;
   onboarding_done: boolean;
   avatar_url: string | null;
+  phone: string | null;
+  position: string | null;
+  password_changed_at: string | null;
+  password_expires_at: string | null;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
@@ -33,6 +37,7 @@ export type Permission = 'read' | 'write';
 const USER_COLUMNS = `
   u.id, u.email, u.full_name, u.role_code, u.department_code, u.allowed_modules,
   u.is_active, u.must_change_password, u.onboarding_done, u.avatar_url,
+  u.phone, u.position, u.password_changed_at, u.password_expires_at,
   u.last_login_at, u.created_at, u.updated_at
 `;
 
@@ -62,6 +67,10 @@ export function mapAuthUser(row: Record<string, unknown>): AuthUser {
     must_change_password: row.must_change_password as boolean,
     onboarding_done: row.onboarding_done as boolean,
     avatar_url: (row.avatar_url as string | null) ?? null,
+    phone: (row.phone as string | null) ?? null,
+    position: (row.position as string | null) ?? null,
+    password_changed_at: (row.password_changed_at as string | null) ?? null,
+    password_expires_at: (row.password_expires_at as string | null) ?? null,
     last_login_at: (row.last_login_at as string | null) ?? null,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
@@ -137,6 +146,21 @@ export async function readableModuleCodes(user: AuthUser): Promise<string[]> {
 export async function writableModuleCodes(user: AuthUser): Promise<string[]> {
   const modules = await getEffectiveModules(user);
   return modules.filter((m) => m.can_write).map((m) => m.code);
+}
+
+/**
+ * ¿El usuario tiene el permiso indicado en **algún** módulo?
+ * Es la condición mínima para los datos transversales que no cuelgan de un
+ * módulo concreto (el directorio de personas, por ejemplo): quien no tiene
+ * ningún módulo no es un usuario operativo del sistema.
+ */
+export async function hasAnyModuleAccess(
+  user: AuthUser,
+  permission: Permission = 'read',
+): Promise<boolean> {
+  if (user.role.has_full_access) return true;
+  const modules = await getEffectiveModules(user);
+  return modules.some((m) => (permission === 'write' ? m.can_write : m.can_read));
 }
 
 /**

@@ -3,6 +3,7 @@ import { ApiError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { getConfigOr, type JobsConfig } from './system.js';
 import { markOverdueLoansJob } from '../jobs/markOverdueLoans.js';
+import { markOverdueInvoicesJob } from '../jobs/markOverdueInvoices.js';
 import { retentionAlertsJob } from '../jobs/retentionAlerts.js';
 import { processDispositionsJob } from '../jobs/processDispositions.js';
 import { purgeTrashJob } from '../jobs/purgeTrash.js';
@@ -13,6 +14,7 @@ export type JobName =
   | 'retention_alerts'
   | 'process_dispositions'
   | 'purge_trash'
+  | 'mark_overdue_invoices'
   | 'refresh_stats';
 
 export const JOB_HANDLERS: Record<JobName, () => Promise<Record<string, unknown>>> = {
@@ -20,6 +22,7 @@ export const JOB_HANDLERS: Record<JobName, () => Promise<Record<string, unknown>
   retention_alerts: retentionAlertsJob,
   process_dispositions: processDispositionsJob,
   purge_trash: purgeTrashJob,
+  mark_overdue_invoices: markOverdueInvoicesJob,
   refresh_stats: refreshStatsJob,
 };
 
@@ -28,6 +31,7 @@ export const DEFAULT_SCHEDULES: JobsConfig = {
   retention_alerts: '10 0 * * *',
   process_dispositions: '20 0 * * *',
   purge_trash: '30 0 * * *',
+  mark_overdue_invoices: '40 0 * * *',
   refresh_stats: '*/15 * * * *',
 };
 

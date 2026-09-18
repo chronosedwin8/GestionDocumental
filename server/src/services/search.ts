@@ -1,10 +1,11 @@
 import { many, one } from '../db/pool.js';
+import { ApiError } from '../lib/errors.js';
 import { resolvePagination, type Paginated } from '../lib/pagination.js';
 import { documentAccessClause, expedienteAccessClause, type AuthUser } from './access.js';
 import { mapDocument, type DocumentDto } from './documents.js';
 import { rankSemantic } from './ai.js';
 import { snippetFor } from './aiText.js';
-import { getConfigOr, type AiSemanticConfig } from './system.js';
+import { getConfigOr, isAiEnabled, type AiSemanticConfig } from './system.js';
 
 const SELECT_DOC = `
   d.id, d.title, d.type, d.module_code, d.folio_index, d.s3_key, d.s3_bucket,
@@ -313,6 +314,12 @@ export async function semanticSearch(
   queryText: string,
   moduleCode?: string,
 ): Promise<SemanticResult> {
+  // La búsqueda semántica depende del motor de IA: si no está configurado, la
+  // respuesta es 503 para todos los usuarios. Comprobarlo *después* de la
+  // preselección hacía que un usuario sin documentos accesibles recibiera un
+  // 200 vacío y creyera que el motor funciona (DEF-13).
+  if (!(await isAiEnabled())) throw ApiError.aiNotConfigured();
+
   const maxCandidates = await getConfigOr<number>('semantic_candidates', 40);
   const cfg = await getConfigOr<AiSemanticConfig>('ai_semantic', {
     snippet_chars: 600,

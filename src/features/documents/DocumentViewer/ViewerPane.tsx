@@ -4,6 +4,7 @@ import * as documentsApi from '@/api/documents';
 import { ApiError, openSignedUrl } from '@/api/client';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Button } from '@/components/ui/Button';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { Spinner } from '@/components/ui/Spinner';
 import type { ApiDocument } from '@/types/api';
 
@@ -87,14 +88,16 @@ export function ViewerPane({ document }: ViewerPaneProps): React.JSX.Element {
             Abrir aparte
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void download()}
-          icon={<Download className="h-3.5 w-3.5" />}
-        >
-          Descargar
-        </Button>
+        <IfFeature code="DOCUMENT_DOWNLOAD">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void download()}
+            icon={<Download className="h-3.5 w-3.5" />}
+          >
+            Descargar
+          </Button>
+        </IfFeature>
       </div>
 
       <div className="min-h-0 flex-1">
@@ -105,9 +108,11 @@ export function ViewerPane({ document }: ViewerPaneProps): React.JSX.Element {
               Este tipo de archivo ({document.file_type || 'desconocido'}) no se puede previsualizar en el
               navegador.
             </p>
-            <Button variant="primary" size="sm" onClick={() => void download()}>
-              Descargar archivo
-            </Button>
+            <IfFeature code="DOCUMENT_DOWNLOAD">
+              <Button variant="primary" size="sm" onClick={() => void download()}>
+                Descargar archivo
+              </Button>
+            </IfFeature>
           </div>
         ) : document.file_type.startsWith('image/') ? (
           <div className="flex h-full items-center justify-center overflow-auto p-3">

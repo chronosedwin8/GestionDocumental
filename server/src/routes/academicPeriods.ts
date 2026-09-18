@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { createAcademicPeriod, listAcademicPeriods, updateAcademicPeriod } from '../services/people.js';
@@ -25,6 +25,7 @@ const periodSchema = z.object({
 academicPeriodsRouter.post(
   '/',
   requireFullAccess,
+  requireFeature('ACADEMIC_PERIOD_MANAGE'),
   validateBody(periodSchema),
   async (req: Request, res: Response) => {
     const period = await createAcademicPeriod(req.body as z.infer<typeof periodSchema>);
@@ -36,6 +37,7 @@ academicPeriodsRouter.post(
 academicPeriodsRouter.patch(
   '/:id',
   requireFullAccess,
+  requireFeature('ACADEMIC_PERIOD_MANAGE'),
   validateBody(periodSchema.partial()),
   async (req: Request, res: Response) => {
     const period = await updateAcademicPeriod(param(req, 'id'), req.body as Record<string, unknown>);

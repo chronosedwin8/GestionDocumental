@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../middleware/auth.js';
+import { requireFeature } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { buildExport, type ExportFormat } from '../lib/exporters.js';
@@ -53,19 +54,19 @@ const ruleSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
-trdRouter.post('/', validateBody(ruleSchema), async (req: Request, res: Response) => {
+trdRouter.post('/', requireFeature('TRD_EDIT'), validateBody(ruleSchema), async (req: Request, res: Response) => {
   const rule = await createRule(currentUser(req), req.body as z.infer<typeof ruleSchema>);
   await audit(req, 'CREATE_RETENTION_RULE', 'retention_rule', (rule as { id: string })?.id ?? null, req.body as Record<string, unknown>);
   res.status(201).json(rule);
 });
 
-trdRouter.put('/:id', validateBody(ruleSchema.partial()), async (req: Request, res: Response) => {
+trdRouter.put('/:id', requireFeature('TRD_EDIT'), validateBody(ruleSchema.partial()), async (req: Request, res: Response) => {
   const rule = await updateRule(currentUser(req), param(req, 'id'), req.body as Record<string, unknown>);
   await audit(req, 'UPDATE_RETENTION_RULE', 'retention_rule', param(req, 'id'), req.body as Record<string, unknown>);
   res.json(rule);
 });
 
-trdRouter.delete('/:id', async (req: Request, res: Response) => {
+trdRouter.delete('/:id', requireFeature('TRD_EDIT'), async (req: Request, res: Response) => {
   await deleteRule(currentUser(req), param(req, 'id'));
   await audit(req, 'DELETE_RETENTION_RULE', 'retention_rule', param(req, 'id'), {});
   res.status(204).end();

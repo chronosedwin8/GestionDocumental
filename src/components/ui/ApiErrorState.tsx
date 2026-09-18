@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, HardDrive, Lock, WifiOff } from 'lucide-react';
+import { AlertTriangle, Bot, HardDrive, Lock, ShieldAlert, WifiOff } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { EmptyState } from './EmptyState';
@@ -58,6 +58,25 @@ export function ApiErrorState({ error, onRetry, className }: ApiErrorStateProps)
         icon={<Lock className="h-8 w-8" />}
         title="Sin permisos"
         description={error.message || 'No tienes acceso a este recurso.'}
+      />
+    );
+  }
+
+  /**
+   * 409. Desde `server/CONTRACT_NOTES.md §9` lo devuelven la descarga de un
+   * documento bloqueado (o de una de sus versiones), la transferencia fuera
+   * de secuencia y las salvaguardas de gobierno sobre usuarios. El mensaje
+   * del servidor es explícito, así que se muestra tal cual.
+   */
+  if (error.code === 'CONFLICT') {
+    return (
+      <EmptyState
+        className={className}
+        tone="warning"
+        icon={<ShieldAlert className="h-8 w-8" />}
+        title="Acción no permitida en este estado"
+        description={error.message || 'El estado actual del recurso no admite esta acción.'}
+        action={onRetry ? { label: 'Reintentar', onClick: onRetry } : undefined}
       />
     );
   }

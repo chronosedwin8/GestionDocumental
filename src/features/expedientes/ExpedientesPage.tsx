@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { Toolbar } from '@/components/ui/Toolbar';
-import { formatDate, relativeDays } from '@/lib/format';
+import { daysUntil, formatDate, relativeDays } from '@/lib/format';
 import type { Expediente, ExpedienteEstado } from '@/types/api';
 import type { Column } from '@/types/ui';
 import { NewCorrespondenceForm } from './NewCorrespondenceForm';
@@ -134,7 +134,10 @@ export default function ExpedientesPage(): React.JSX.Element {
         render: (row) => {
           if (row.responded_at) return <Badge color="var(--color-success)">Respondida</Badge>;
           if (!row.response_due_at) return <span className="text-xs text-content-muted">—</span>;
-          const overdue = new Date(row.response_due_at).getTime() < Date.now();
+          // `response_due_at` es una fecha civil: se compara con `daysUntil`,
+          // que la resuelve contra el inicio del día local (CONTRACT_NOTES §9).
+          const days = daysUntil(row.response_due_at);
+          const overdue = days !== null && days < 0;
           return (
             <Badge color={overdue ? 'var(--color-danger)' : 'var(--color-warning)'}>
               {overdue ? 'Vencida' : relativeDays(row.response_due_at)}

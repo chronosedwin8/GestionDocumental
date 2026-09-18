@@ -188,6 +188,15 @@ export function Topbar({
               )}
             </div>
             <Link
+              to="/mi-perfil"
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2 text-sm text-content-secondary no-underline transition-colors hover:bg-surface-overlay hover:text-content-primary hover:no-underline"
+            >
+              <UserIcon className="h-4 w-4" aria-hidden />
+              Mi perfil
+            </Link>
+            <Link
               to="/cambiar-contrasena"
               role="menuitem"
               onClick={() => setMenuOpen(false)}
@@ -202,7 +211,7 @@ export function Topbar({
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2.5 px-3 py-2 text-sm text-content-secondary no-underline transition-colors hover:bg-surface-overlay hover:text-content-primary hover:no-underline"
             >
-              <UserIcon className="h-4 w-4" aria-hidden />
+              <Bell className="h-4 w-4" aria-hidden />
               Mis notificaciones
             </Link>
             <button

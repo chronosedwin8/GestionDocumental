@@ -3,7 +3,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { ApiError } from '../lib/errors.js';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireFullAccess, requireModuleAccess, moduleFromBody } from '../middleware/authorize.js';
+import { moduleFromBody, requireFeature, requireFullAccess, requireModuleAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { listCustody } from '../services/custody.js';
@@ -95,6 +95,7 @@ documentsRouter.post(
   '/',
   uploadSingle,
   requireModuleAccess(moduleFromBody('module_code'), 'write'),
+  requireFeature('DOCUMENT_UPLOAD'),
   async (req: Request, res: Response) => {
     const file = req.file;
     if (!file) throw ApiError.badRequest('Debes adjuntar un archivo en el campo "file".');
@@ -153,7 +154,7 @@ const patchSchema = z.object({
   academic_period_id: z.string().uuid().nullable().optional(),
 });
 
-documentsRouter.patch('/:id', validateBody(patchSchema), async (req: Request, res: Response) => {
+documentsRouter.patch('/:id', requireFeature('DOCUMENT_EDIT'), validateBody(patchSchema), async (req: Request, res: Response) => {
   const document = await updateDocument(currentUser(req), param(req, 'id'), req.body as Record<string, unknown>);
   await audit(req, 'UPDATE_DOCUMENT', 'document', document.id, req.body as Record<string, unknown>);
   res.json(document);
@@ -161,6 +162,7 @@ documentsRouter.patch('/:id', validateBody(patchSchema), async (req: Request, re
 
 documentsRouter.get(
   '/:id/download',
+  requireFeature('DOCUMENT_DOWNLOAD'),
   validateQuery(z.object({ disposition: z.enum(['inline', 'attachment']).default('inline') })),
   async (req: Request, res: Response) => {
     const { disposition } = req.query as unknown as { disposition: 'inline' | 'attachment' };
@@ -176,6 +178,7 @@ documentsRouter.get('/:id/text', async (req: Request, res: Response) => {
 
 documentsRouter.post(
   '/:id/folio',
+  requireFeature('DOCUMENT_FOLIO'),
   validateBody(z.object({ manual_folio: z.string().min(3).nullable().optional() })),
   async (req: Request, res: Response) => {
     const body = req.body as { manual_folio?: string | null };
@@ -185,13 +188,13 @@ documentsRouter.post(
   },
 );
 
-documentsRouter.post('/:id/lock', async (req: Request, res: Response) => {
+documentsRouter.post('/:id/lock', requireFeature('DOCUMENT_LOCK'), async (req: Request, res: Response) => {
   const document = await setLock(currentUser(req), param(req, 'id'), true);
   await audit(req, 'LOCK_DOCUMENT', 'document', param(req, 'id'), {});
   res.json(document);
 });
 
-documentsRouter.post('/:id/unlock', async (req: Request, res: Response) => {
+documentsRouter.post('/:id/unlock', requireFeature('DOCUMENT_LOCK'), async (req: Request, res: Response) => {
   const document = await setLock(currentUser(req), param(req, 'id'), false);
   await audit(req, 'UNLOCK_DOCUMENT', 'document', param(req, 'id'), {});
   res.json(document);
@@ -199,6 +202,7 @@ documentsRouter.post('/:id/unlock', async (req: Request, res: Response) => {
 
 documentsRouter.post(
   '/:id/approve',
+  requireFeature('DOCUMENT_APPROVE'),
   validateBody(z.object({ reason: z.string().optional() })),
   async (req: Request, res: Response) => {
     const body = req.body as { reason?: string };
@@ -210,6 +214,7 @@ documentsRouter.post(
 
 documentsRouter.post(
   '/:id/transfer',
+  requireFeature('DOCUMENT_TRANSFER'),
   validateBody(z.object({ to: z.enum(['ARCHIVO_CENTRAL', 'ARCHIVO_HISTORICO']).optional() })),
   async (req: Request, res: Response) => {
     const body = req.body as { to?: string };
@@ -221,6 +226,7 @@ documentsRouter.post(
 
 documentsRouter.post(
   '/:id/trash',
+  requireFeature('DOCUMENT_TRASH'),
   validateBody(z.object({ reason: z.string().min(3, 'El motivo es obligatorio.') })),
   async (req: Request, res: Response) => {
     const body = req.body as { reason: string };
@@ -230,13 +236,13 @@ documentsRouter.post(
   },
 );
 
-documentsRouter.post('/:id/restore', async (req: Request, res: Response) => {
+documentsRouter.post('/:id/restore', requireFeature('TRASH_RESTORE'), async (req: Request, res: Response) => {
   await restoreDocument(currentUser(req), param(req, 'id'));
   await audit(req, 'RESTORE_DOCUMENT', 'document', param(req, 'id'), {});
   res.status(204).end();
 });
 
-documentsRouter.delete('/:id', requireFullAccess, async (req: Request, res: Response) => {
+documentsRouter.delete('/:id', requireFullAccess, requireFeature('TRASH_PURGE'), async (req: Request, res: Response) => {
   const result = await purgeFromTrash(currentUser(req), param(req, 'id'));
   await audit(req, 'PURGE_DOCUMENT', 'document', param(req, 'id'), result);
   res.status(204).end();
@@ -251,6 +257,7 @@ documentsRouter.get('/:id/tags', async (req: Request, res: Response) => {
 
 documentsRouter.post(
   '/:id/tags',
+  requireFeature('DOCUMENT_TAG_EDIT'),
   validateBody(z.object({ tags: z.array(z.string().min(1)).min(1) })),
   async (req: Request, res: Response) => {
     const body = req.body as { tags: string[] };
@@ -260,7 +267,7 @@ documentsRouter.post(
   },
 );
 
-documentsRouter.delete('/:id/tags/:tag', async (req: Request, res: Response) => {
+documentsRouter.delete('/:id/tags/:tag', requireFeature('DOCUMENT_TAG_EDIT'), async (req: Request, res: Response) => {
   const tags = await removeTag(currentUser(req), param(req, 'id'), decodeURIComponent(param(req, 'tag')));
   await audit(req, 'REMOVE_TAG', 'document', param(req, 'id'), { tag: param(req, 'tag') });
   res.json(tags);
@@ -275,6 +282,7 @@ documentsRouter.get('/:id/metadata', async (req: Request, res: Response) => {
 
 documentsRouter.put(
   '/:id/metadata',
+  requireFeature('DOCUMENT_METADATA_EDIT'),
   validateBody(
     z.object({
       key: z.string().min(1),
@@ -291,7 +299,7 @@ documentsRouter.put(
   },
 );
 
-documentsRouter.delete('/:id/metadata/:key', async (req: Request, res: Response) => {
+documentsRouter.delete('/:id/metadata/:key', requireFeature('DOCUMENT_METADATA_EDIT'), async (req: Request, res: Response) => {
   const metadata = await deleteMetadata(currentUser(req), param(req, 'id'), decodeURIComponent(param(req, 'key')));
   await audit(req, 'DELETE_METADATA', 'document', param(req, 'id'), { key: param(req, 'key') });
   res.json(metadata);
@@ -306,6 +314,7 @@ documentsRouter.get('/:id/notes', async (req: Request, res: Response) => {
 
 documentsRouter.post(
   '/:id/notes',
+  requireFeature('DOCUMENT_NOTE_ADD'),
   validateBody(z.object({ text: z.string().min(1) })),
   async (req: Request, res: Response) => {
     const user = currentUser(req);
@@ -323,7 +332,7 @@ documentsRouter.get('/:id/versions', async (req: Request, res: Response) => {
   res.json(await listVersions(param(req, 'id')));
 });
 
-documentsRouter.post('/:id/versions', uploadSingle, async (req: Request, res: Response) => {
+documentsRouter.post('/:id/versions', requireFeature('DOCUMENT_VERSION_UPLOAD'), uploadSingle, async (req: Request, res: Response) => {
   const file = req.file;
   if (!file) throw ApiError.badRequest('Debes adjuntar el archivo de la nueva versión.');
   const body = req.body as Record<string, string>;
@@ -337,7 +346,7 @@ documentsRouter.post('/:id/versions', uploadSingle, async (req: Request, res: Re
   res.status(201).json(version);
 });
 
-documentsRouter.get('/:id/versions/:versionId/download', async (req: Request, res: Response) => {
+documentsRouter.get('/:id/versions/:versionId/download', requireFeature('DOCUMENT_DOWNLOAD'), async (req: Request, res: Response) => {
   const result = await downloadVersion(currentUser(req), param(req, 'id'), param(req, 'versionId'));
   await audit(req, 'DOWNLOAD_VERSION', 'document', param(req, 'id'), { version_id: param(req, 'versionId') });
   res.json(result);
@@ -352,6 +361,7 @@ documentsRouter.get('/:id/relations', async (req: Request, res: Response) => {
 
 documentsRouter.post(
   '/:id/relations',
+  requireFeature('DOCUMENT_RELATION_MANAGE'),
   validateBody(
     z.object({
       target_document_id: z.string().uuid(),
@@ -366,7 +376,7 @@ documentsRouter.post(
   },
 );
 
-documentsRouter.delete('/:id/relations/:relationId', async (req: Request, res: Response) => {
+documentsRouter.delete('/:id/relations/:relationId', requireFeature('DOCUMENT_RELATION_MANAGE'), async (req: Request, res: Response) => {
   const relations = await removeRelation(currentUser(req), param(req, 'id'), param(req, 'relationId'));
   await audit(req, 'REMOVE_RELATION', 'document', param(req, 'id'), { relation_id: param(req, 'relationId') });
   res.json(relations);
@@ -374,13 +384,14 @@ documentsRouter.delete('/:id/relations/:relationId', async (req: Request, res: R
 
 // ── Permisos por documento ──────────────────────────────────
 
-documentsRouter.get('/:id/permissions', requireFullAccess, async (req: Request, res: Response) => {
+documentsRouter.get('/:id/permissions', requireFullAccess, requireFeature('DOCUMENT_PERMISSION_MANAGE'), async (req: Request, res: Response) => {
   res.json(await listPermissions(param(req, 'id')));
 });
 
 documentsRouter.put(
   '/:id/permissions',
   requireFullAccess,
+  requireFeature('DOCUMENT_PERMISSION_MANAGE'),
   validateBody(
     z.object({
       role_code: z.string().min(2),
@@ -399,7 +410,7 @@ documentsRouter.put(
 
 // ── Custodia ────────────────────────────────────────────────
 
-documentsRouter.get('/:id/custody', async (req: Request, res: Response) => {
+documentsRouter.get('/:id/custody', requireFeature('CUSTODY_VIEW'), async (req: Request, res: Response) => {
   const user = currentUser(req);
   const privileged = user.role.has_full_access || ['AUDITOR', 'ARCHIVISTA'].includes(user.role_code);
   if (!privileged) throw ApiError.forbidden('No tienes permiso para consultar la cadena de custodia.');
@@ -413,6 +424,7 @@ const analyzeBodySchema = z.object({ include_metadata: z.boolean().optional().de
 
 documentsRouter.post(
   '/:id/ai/analyze',
+  requireFeature('AI_ANALYZE'),
   validateBody(analyzeBodySchema),
   async (req: Request, res: Response) => {
     const user = currentUser(req);
@@ -439,6 +451,7 @@ documentsRouter.get('/:id/trd', async (req: Request, res: Response) => {
 
 documentsRouter.put(
   '/:id/trd',
+  requireFeature('DOCUMENT_EDIT'),
   validateBody(z.object({ document_type: z.string().min(1) })),
   async (req: Request, res: Response) => {
     const body = req.body as { document_type: string };
@@ -452,6 +465,7 @@ documentsRouter.put(
 
 documentsRouter.post(
   '/:id/loans',
+  requireFeature('LOAN_CREATE'),
   validateBody(
     z.object({
       loaned_to: z.string().uuid(),

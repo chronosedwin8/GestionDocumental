@@ -65,6 +65,13 @@ export async function updateRule(user: AuthUser, id: string, updates: Record<str
   if (!rule) throw ApiError.notFound('La regla de retención no existe.');
   await assertCanManage(user, rule.module_code);
 
+  // Mover la regla a otro módulo exige permiso también sobre el módulo de
+  // destino: si no, un usuario departamental altera la TRD de otra dependencia (DEF-09).
+  const targetModule = updates.module_code;
+  if (typeof targetModule === 'string' && targetModule !== rule.module_code) {
+    await assertCanManage(user, targetModule);
+  }
+
   const fields = ['module_code', 'document_type', 'retention_years', 'disposition_code', 'description'];
   const sets: string[] = [];
   const params: unknown[] = [id];

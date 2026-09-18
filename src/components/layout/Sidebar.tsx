@@ -3,6 +3,7 @@ import {
   Archive,
   BarChart2,
   Bell,
+  Briefcase,
   FileSpreadsheet,
   FolderOpen,
   LayoutDashboard,
@@ -10,12 +11,14 @@ import {
   Settings,
   Trash2,
   UserRound,
+  Wallet,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCatalogs } from '@/contexts/CatalogContext';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
+import { useFeature } from '@/hooks/useFeature';
 
 export interface SidebarProps {
   open: boolean;
@@ -80,6 +83,8 @@ function NavGroup({ title, items, onNavigate }: { title: string; items: NavItem[
 export function Sidebar({ open, onClose, unreadCount }: SidebarProps): React.JSX.Element {
   const { activeModules, moduleColor, moduleDescription } = useCatalogs();
   const { canRead, isAdminArea } = useAuth();
+  // La sección comercial solo se ofrece con la característica correspondiente.
+  const canSeeBilling = useFeature('BILLING_VIEW');
 
   const moduleItems: NavItem[] = activeModules
     .filter((module) => canRead(module.code))
@@ -201,6 +206,27 @@ export function Sidebar({ open, onClose, unreadCount }: SidebarProps): React.JSX
               },
             ]}
           />
+
+          {canSeeBilling && (
+            <NavGroup
+              title="Comercial"
+              onNavigate={onClose}
+              items={[
+                {
+                  to: '/comercial',
+                  label: 'Panel comercial',
+                  description: 'Clientes, cotizaciones y facturas',
+                  icon: <Briefcase className="h-5 w-5 text-acid" aria-hidden />,
+                },
+                {
+                  to: '/mi-cuenta',
+                  label: 'Mi cuenta',
+                  description: 'Licencia y facturas de la institución',
+                  icon: <Wallet className="h-5 w-5 text-state-info" aria-hidden />,
+                },
+              ]}
+            />
+          )}
 
           {isAdminArea && (
             <NavGroup

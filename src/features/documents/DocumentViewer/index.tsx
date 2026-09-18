@@ -30,8 +30,10 @@ import { Badge } from '@/components/ui/Badge';
 import { BookmarkButton } from '@/components/ui/BookmarkButton';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { FullPageSpinner } from '@/components/ui/Spinner';
 import { Tabs } from '@/components/ui/Tabs';
+import { todayInput } from '@/lib/format';
 import { useDocument } from '../useDocument';
 import { ChatTab } from './ChatTab';
 import { CustodyTab } from './CustodyTab';
@@ -43,6 +45,9 @@ import { SecurityTab } from './SecurityTab';
 import { TrdTab } from './TrdTab';
 import { VersionsTab } from './VersionsTab';
 import { ViewerPane } from './ViewerPane';
+
+/** Plazo por defecto del préstamo creado desde el visor. */
+const LOAN_DAYS = 15;
 
 export interface DocumentViewerProps {
   documentId: string;
@@ -73,7 +78,8 @@ export function DocumentViewer({
   onRemoved,
 }: DocumentViewerProps): React.JSX.Element | null {
   const { canWrite, hasFullAccess } = useAuth();
-  const { status, statusLabel, statusColor, moduleLabel, moduleColor, settings } = useCatalogs();
+  const { status, statusLabel, statusColor, moduleLabel, moduleColor, settings, nextArchivalStatus } =
+    useCatalogs();
   const { confirm, promptText } = useDialogs();
   const { document, loading, error, refetch, apply } = useDocument(open ? documentId : null);
   const [tab, setTab] = useState<TabId>('info');
@@ -169,18 +175,29 @@ export function DocumentViewer({
     });
   };
 
+  /**
+   * Transferencia. Desde `server/CONTRACT_NOTES.md §9` el cliente **no** envía
+   * destino: el servidor avanza un paso de la secuencia archivística y un `to`
+   * que no sea el siguiente devuelve 409. El diálogo muestra el destino
+   * previsto tomándolo del catálogo de estados, pero no lo impone; si el
+   * servidor avanza a otro (por ejemplo por la disposición de la TRD), manda
+   * el estado que devuelve la respuesta.
+   */
   const transfer = async (): Promise<void> => {
     if (!document) return;
+    const next = nextArchivalStatus(document.status_code);
     const ok = await confirm({
       title: 'Transferir documento',
-      message:
-        'El documento avanzará a la siguiente fase del ciclo archivístico y quedará registrado en la cadena de custodia.',
+      message: next
+        ? `El documento avanzará un paso en la secuencia archivística; el destino previsto es "${next.name}". El servidor decide el estado final y la transferencia queda en la cadena de custodia.`
+        : 'El documento avanzará un paso en la secuencia archivística, según el orden del catálogo de estados. El servidor decide el destino y la transferencia queda en la cadena de custodia.',
       confirmLabel: 'Transferir',
     });
     if (!ok) return;
     await run(async () => {
-      apply(await documentsApi.transferDocument(document.id));
-      toast.success('Transferencia registrada.');
+      const updated = await documentsApi.transferDocument(document.id);
+      apply(updated);
+      toast.success(`Transferencia registrada: ${statusLabel(updated.status_code)}.`);
     });
   };
 
@@ -225,17 +242,18 @@ export function DocumentViewer({
     });
     if (!purpose) return;
 
-    const due = new Date();
-    due.setDate(due.getDate() + 15);
+    // `expected_return_date` es una columna `date`: se envía como fecha civil
+    // `YYYY-MM-DD`, no como marca de tiempo UTC (CONTRACT_NOTES §9).
+    const due = todayInput(LOAN_DAYS);
 
     await run(async () => {
       await documentsApi.createLoan(document.id, {
         loaned_to: userId,
-        expected_return_date: due.toISOString(),
+        expected_return_date: due,
         purpose,
       });
       invalidatePrefix('loans:');
-      toast.success('Préstamo registrado por 15 días.');
+      toast.success(`Préstamo registrado por ${LOAN_DAYS} días.`);
     });
   };
 
@@ -342,55 +360,67 @@ export function DocumentViewer({
         document && (
           <div className="flex w-full flex-wrap items-center gap-2">
             {writable && !document.folio_index && (
-              <Button
-                size="sm"
-                variant="outline"
-                loading={busy}
-                onClick={() => void assignFolio()}
-                icon={<Hash className="h-3.5 w-3.5" />}
-              >
-                Foliar
-              </Button>
+              <IfFeature code="DOCUMENT_FOLIO">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={busy}
+                  onClick={() => void assignFolio()}
+                  icon={<Hash className="h-3.5 w-3.5" />}
+                >
+                  Foliar
+                </Button>
+              </IfFeature>
             )}
             {writable && (
-              <Button
-                size="sm"
-                variant="outline"
-                loading={busy}
-                onClick={() => void transfer()}
-                icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
-              >
-                Transferir
-              </Button>
+              <IfFeature code="DOCUMENT_TRANSFER">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={busy}
+                  onClick={() => void transfer()}
+                  icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
+                >
+                  Transferir
+                </Button>
+              </IfFeature>
             )}
             {canWrite(document.module_code) && (
-              <Button size="sm" variant="outline" loading={busy} onClick={() => void createLoan()}>
-                Prestar
-              </Button>
+              <IfFeature code="LOAN_CREATE">
+                <Button size="sm" variant="outline" loading={busy} onClick={() => void createLoan()}>
+                  Prestar
+                </Button>
+              </IfFeature>
             )}
             <BookmarkButton documentId={document.id} documentTitle={document.title} withLabel />
-            {hasFullAccess && (
-              <Button
-                size="sm"
-                variant="outline"
-                loading={busy}
-                onClick={() => void (isLocked ? unlock() : lock())}
-                icon={isLocked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-              >
-                {isLocked ? 'Desbloquear' : 'Bloquear'}
-              </Button>
+            {/* Bloquear y desbloquear exigen escritura sobre el documento: el
+                servidor responde 403 FORBIDDEN sin ella (CONTRACT_NOTES §9). */}
+            {canWrite(document.module_code) && (
+              <IfFeature code="DOCUMENT_LOCK">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={busy}
+                  onClick={() => void (isLocked ? unlock() : lock())}
+                  icon={isLocked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                >
+                  {isLocked ? 'Desbloquear' : 'Bloquear'}
+                </Button>
+              </IfFeature>
             )}
             <div className="flex-1" />
             {writable && (
-              <Button
-                size="sm"
-                variant="danger"
-                loading={busy}
-                onClick={() => void sendToTrash()}
-                icon={<Trash2 className="h-3.5 w-3.5" />}
-              >
-                Enviar a papelera
-              </Button>
+              <IfFeature code="DOCUMENT_TRASH">
+                <Button
+                  size="sm"
+                  variant="danger"
+                  loading={busy}
+                  onClick={() => void sendToTrash()}
+                  icon={<Trash2 className="h-3.5 w-3.5" />}
+                >
+                  Enviar a papelera
+                </Button>
+              </IfFeature>
             )}
           </div>
         )

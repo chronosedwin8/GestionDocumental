@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../middleware/auth.js';
-import { requireFullAccess } from '../middleware/authorize.js';
+import { requireFeature, requireFullAccess } from '../middleware/authorize.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { audit } from '../services/audit.js';
 import { createCategory, deleteCategory, listCategories, updateCategory } from '../services/categories.js';
@@ -41,6 +41,7 @@ const categorySchema = z.object({
 categoriesRouter.post(
   '/',
   requireFullAccess,
+  requireFeature('CATEGORY_MANAGE'),
   validateBody(categorySchema),
   async (req: Request, res: Response) => {
     const category = await createCategory(currentUser(req).id, req.body as z.infer<typeof categorySchema>);
@@ -52,6 +53,7 @@ categoriesRouter.post(
 categoriesRouter.patch(
   '/:id',
   requireFullAccess,
+  requireFeature('CATEGORY_MANAGE'),
   validateBody(categorySchema.partial()),
   async (req: Request, res: Response) => {
     const category = await updateCategory(param(req, 'id'), req.body as Record<string, unknown>);
@@ -60,7 +62,7 @@ categoriesRouter.patch(
   },
 );
 
-categoriesRouter.delete('/:id', requireFullAccess, async (req: Request, res: Response) => {
+categoriesRouter.delete('/:id', requireFullAccess, requireFeature('CATEGORY_MANAGE'), async (req: Request, res: Response) => {
   await deleteCategory(param(req, 'id'));
   await audit(req, 'DELETE_CATEGORY', 'category', param(req, 'id'), {});
   res.status(204).end();

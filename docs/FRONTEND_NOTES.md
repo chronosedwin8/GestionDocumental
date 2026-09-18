@@ -279,3 +279,124 @@ está configurada.
    escritura devuelven 503 `AI_NOT_CONFIGURED`, que es justamente el camino de
    estado vacío honesto que se comprobó. Las respuestas con IA encendida no se
    han visto en vivo.
+
+---
+
+## 12. Fase 6 — Características por rol, usuarios y panel comercial
+
+Cubre `docs/PERMISOS_Y_USUARIOS.md`, `docs/FACTURACION.md` y la adaptación a
+`server/CONTRACT_NOTES.md §9`.
+
+### 12.1 Adaptación a los cambios de contrato (§9)
+
+| Cambio del servidor | Qué se hizo en la interfaz |
+|---|---|
+| `POST /documents/:id/transfer` ya no admite `to` | `transferDocument(id)` envía `{}`. El diálogo muestra el destino **previsto** con `nextArchivalStatus()` (derivado del `sort_order` de `document_statuses`, igual que `catalogs.nextArchivalStatus()` del servidor) y dice que el servidor decide; el estado final se toma de la respuesta. |
+| 403 al bloquear o desbloquear sin escritura | El botón de bloqueo pasó de `hasFullAccess` a `canWrite(module)` más `DOCUMENT_LOCK`. El mensaje del rechazo se muestra tal cual en el aviso. |
+| 403 al crear notas | `NotesTab` conserva `canWrite` y añade `DOCUMENT_NOTE_ADD`; el error del servidor se muestra literal. |
+| 403 al gestionar personas sin dependencias | `PeoplePage` y `PersonDetailPage` exigen además `PEOPLE_MANAGE` para ofrecer alta y edición. |
+| 403 al mover una regla de retención a otro módulo | El selector de dependencia ya solo listaba módulos con escritura y ahora lo explica en la ayuda del campo. |
+| 409 al descargar un documento bloqueado o una versión suya | `ApiErrorState` tiene una rama `CONFLICT` («Acción no permitida en este estado») que muestra el mensaje del servidor. La usan el visor y la pestaña de versiones. |
+| 409 en las salvaguardas de gobierno (`PATCH /users/:id`, `/deactivate`) | Los avisos de `UsersTab` muestran `err.message` sin reescribirlo; el diálogo de edición advierte cuando la cuenta editada es la propia. |
+| `recent_activity` puede llegar vacío | El tablero distingue los dos casos leyendo `AUDIT_VIEW`: «todavía no hay acciones» frente a «aquí aparecerán tus propias acciones; el historial completo lo ve quien tiene permiso de auditoría». No se presenta como fallo. |
+| `GET /people` con cero resultados y `GET /people/:id` 404 | Estado vacío que nombra las dos causas posibles (no hay personas registradas o no hay dependencias legibles) y, en la ficha, «Ficha no disponible», sin distinguir «no existe» de «no puedes verlo», igual que el servidor. |
+| `POST /search/semantic` siempre 503 sin IA | El modo semántico se deshabilita si `settings.ai_enabled` es falso o falta `SEARCH_SEMANTIC`, y el aviso explica el 503. |
+| Fechas civiles `YYYY-MM-DD` | `src/lib/format.ts` centraliza el análisis en `parseApiDate()`, que usan `formatDate` y `daysUntil`; `toDateInput` devuelve la fecha civil sin reinterpretarla y se añadió `todayInput(offset)`. Se corrigió la comparación de `response_due_at` en expedientes (antes `new Date(x) < Date.now()` marcaba «vencido» el mismo día por el desfase con UTC) y el préstamo del visor, que enviaba `expected_return_date` como marca de tiempo. Los `new Date()` que quedan son «ahora» o marcas de tiempo reales (`locked_until`, `password_expires_at`). |
+
+### 12.2 Características por rol
+
+- `CatalogContext` expone `features`, `featureCategories` y sus ayudantes. Si
+  `GET /catalogs` no trae `features` ni `feature_categories`, se piden a
+  `GET /features`; si tampoco existe, la matriz muestra un estado vacío en vez
+  de inventar códigos.
+- `AuthContext` expone `effectiveFeatures` y `hasFeature`. **Sin
+  `effective_features` publicado, `hasFeature` devuelve `true`**: ocultar sin
+  dato sería inventar una restricción que el servidor no aplica.
+- `useFeature(code)`, `useFeatures(codes, mode)` e `IfFeature` envuelven las
+  acciones. Ocultar no protege: la decisión vinculante es el 403
+  `FEATURE_DISABLED` del servidor.
+- Códigos aplicados: `DOCUMENT_UPLOAD`, `DOCUMENT_DOWNLOAD`, `DOCUMENT_FOLIO`,
+  `DOCUMENT_TRANSFER`, `DOCUMENT_LOCK`, `DOCUMENT_NOTE_ADD`, `DOCUMENT_TRASH`,
+  `LOAN_CREATE`, `TRASH_RESTORE`, `TRASH_PURGE`, `TRD_EDIT`, `TRD_EXPORT`,
+  `PEOPLE_MANAGE`, `SEARCH_SEMANTIC`, `AUDIT_VIEW`, `AUDIT_EXPORT`,
+  `AI_REPROCESS`, `USER_MANAGE`, `USER_RESET_PASSWORD`, `USER_SESSION_REVOKE`,
+  `BILLING_VIEW`, `CLIENT_MANAGE`, `QUOTE_MANAGE`, `INVOICE_MANAGE`,
+  `PAYMENT_MANAGE` y `LICENSE_MANAGE`.
+- La matriz (`/admin/caracteristicas`) agrupa por categoría con filas
+  plegables, un interruptor por celda, otro por categoría y rol, contador de
+  activas por rol, resaltado de las sensibles, restauración global y por rol, y
+  candado con explicación en las celdas núcleo de un rol de acceso total. Al
+  apagar una categoría en un rol de acceso total, las núcleo se excluyen del
+  lote: enviarlas provocaría un 409 `CORE_FEATURE` que tumbaría el resto.
+
+### 12.3 Usuarios, perfil y contraseñas
+
+- `UsersTab` añade estado de la contraseña (vigente, por vencer, vencida o
+  temporal, derivado de `must_change_password` y `password_expires_at`),
+  bloqueo con desbloqueo, número de sesiones activas, actividad reciente
+  (`GET /users/:id/activity`), forzar cambio de contraseña, y teléfono y cargo
+  en el formulario. La contraseña temporal se muestra una sola vez con botón de
+  copiar y declara su vigencia leyéndola de la política.
+- `/mi-perfil`, para cualquier usuario autenticado: datos personales contra
+  `GET/PATCH /me/profile`, cambio de contraseña con `PasswordStrength`,
+  dependencias con lectura y escritura, características habilitadas agrupadas
+  por categoría, y cierre de sesiones.
+- `PasswordStrength` construye sus reglas **solo** con lo que declara
+  `GET /system/password-policy`. Sin política no puntúa: lo dice y deja que el
+  servidor valide.
+
+### 12.4 Panel comercial
+
+`/comercial/{resumen,clientes,cotizaciones,facturas,licencias}` y `/mi-cuenta`,
+ambos tras `BILLING_VIEW`. Importes con `formatMoney` (pesos con separador de
+miles, moneda de cada documento, sin centavos en COP).
+
+**Ningún total se calcula en el cliente.** El resumen muestra cartera pendiente
+y vencida tal como llegan y, en vez de sumar los meses, presenta el **último
+mes informado**. Tras registrar un pago se vuelve a pedir `GET /invoices/:id`
+para leer el saldo que recalculó el disparador. El aviso de que esto **no** es
+factura electrónica válida ante la DIAN aparece en la cabecera del panel, en la
+vista de 360°, en los formularios de cotización y factura y en «Mi cuenta».
+
+### 12.5 Rutas consumidas
+
+Consumidas y comprobadas en vivo por el proxy (200 salvo donde se indica):
+`GET /features`, `GET/PUT /features/matrix`, `PUT /features/matrix/bulk`,
+`POST /features/matrix/reset`, `GET /auth/me` (con `effective_features`),
+`GET /catalogs` (con `features` y `feature_categories`),
+`GET/PATCH /me/profile`, `GET /system/password-policy`,
+`POST /users/:id/unlock`, `POST /users/:id/force-password-change`,
+`GET /users/:id/activity`, `GET/DELETE /users/:id/sessions`,
+`GET/POST/PATCH /clients`, `GET /clients/:id/summary`, `GET /license-plans`,
+`GET/POST/PATCH /licenses`, `POST /licenses/:id/renew`,
+`GET /licenses/expiring`, `GET/POST/PATCH /quotes`, `POST /quotes/:id/status`,
+`POST /quotes/:id/convert`, `GET /quotes/:id/pdf`, `GET/POST/PATCH /invoices`,
+`POST /invoices/:id/issue`, `POST /invoices/:id/void`, `GET /invoices/:id/pdf`,
+`GET/POST/DELETE /payments`, `GET /billing/stats` y
+`GET /billing/my-account` (404 con mensaje mientras no haya cliente asociado).
+
+**Sin interfaz todavía**: `POST/PATCH /license-plans` (los planes se leen pero
+no se editan desde el panel), `PUT /system/password-policy` (la política se lee,
+no se edita) y `DELETE /payments/:id` (hay función de API con motivo, pero no
+botón: la reversión de pagos no se ofreció en esta entrega).
+
+### 12.6 Problemas conocidos de la Fase 6
+
+1. **No hay `/me/sessions`.** «Mi perfil» usa `GET/DELETE /users/:id/sessions`
+   con el identificador propio, y el borrado revoca **todas** las sesiones,
+   incluida la del navegador actual; la interfaz lo advierte. Un
+   `DELETE /me/sessions/:id` permitiría cerrar solo las demás.
+2. **`GET /system/password-policy` puede exigir permiso.** El contrato agrupa
+   lectura y escritura bajo `SYSTEM_CONFIG_EDIT`. Si un usuario sin ese permiso
+   recibe 403, «Mi perfil» no puntúa la contraseña y lo explica en vez de
+   inventar reglas.
+3. **Los estados comerciales no son un catálogo editable.** `DRAFT`, `ISSUED`,
+   `PARTIAL` y los demás los fija `docs/FACTURACION.md` en el propio modelo, así
+   que `features/billing/labels.ts` es solo una tabla de traducción con respaldo
+   al código crudo, no una fuente de verdad.
+4. **`/billing/my-account` depende de la configuración del cliente propio.** Sin
+   ese ajuste el servidor responde 404 y la vista muestra su mensaje.
+5. **Sin datos comerciales en esta máquina.** Clientes, cotizaciones, facturas y
+   pagos responden 200 con listas vacías: los caminos con datos se comprobaron
+   con pruebas, no en vivo.
+6. **La reversión de pagos y la edición de planes quedan pendientes** (ver 12.5).

@@ -19,8 +19,11 @@ INSERT INTO system_config (key, value, is_secret, description) VALUES
    'Servidor de correo saliente {host, port, secure, user, password, from}'),
 
   ('password_policy',
-   '{"min_length": 8, "require_uppercase": true, "require_number": true, "max_attempts": 5, "lockout_minutes": 15}'::jsonb,
-   false, 'Política de contraseñas y bloqueo por intentos fallidos'),
+   '{"min_length": 8, "require_upper": true, "require_lower": false, "require_digit": true,
+     "require_symbol": false, "max_attempts": 5, "lockout_minutes": 15,
+     "expiry_days": null, "history_count": 0, "temporary_ttl_hours": 72}'::jsonb,
+   false,
+   'Política de contraseñas: composición, bloqueo por intentos, caducidad (expiry_days null = sin caducidad), historial que impide reutilizar (history_count 0 = sin historial) y vigencia de la contraseña temporal'),
 
   ('trash_retention_days', '30'::jsonb, false,
    'Días que un documento permanece en la papelera antes de la purga física'),
@@ -69,6 +72,7 @@ INSERT INTO system_config (key, value, is_secret, description) VALUES
      "retention_alerts":   "10 0 * * *",
      "process_dispositions": "20 0 * * *",
      "purge_trash":        "30 0 * * *",
+     "mark_overdue_invoices": "40 0 * * *",
      "refresh_stats":      "*/15 * * * *"}'::jsonb,
    false, 'Horarios cron de los trabajos programados'),
 

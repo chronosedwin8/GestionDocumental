@@ -1,7 +1,7 @@
 import { many, one, query } from '../db/pool.js';
 import { ApiError } from '../lib/errors.js';
 import { resolvePagination, type Paginated } from '../lib/pagination.js';
-import type { AuthUser } from './access.js';
+import { hasAnyModuleAccess, readableModuleCodes, type AuthUser } from './access.js';
 import { getConfigOr } from './system.js';
 import { createExpediente } from './expedientes.js';
 
@@ -14,14 +14,27 @@ const PERSON_SELECT = `
   p.position, p.grade, p.status, p.extra, p.created_at, p.updated_at
 `;
 
-export async function listPeople(filters: {
-  type?: string;
-  q?: string;
-  status?: string;
-  page?: number;
-  pageSize?: number;
-}): Promise<Paginated<PersonRow>> {
+/**
+ * Directorio de personas. Contiene datos personales de empleados y de
+ * estudiantes menores de edad (documento de identidad, correo, teléfono, fecha
+ * de nacimiento), así que solo lo ve quien tenga acceso a alguna dependencia.
+ * Igual que `GET /documents`, una cuenta sin módulos recibe 200 con cero filas
+ * en lugar de un error: es una lista vacía, no un recurso inexistente (DEF-05).
+ */
+export async function listPeople(
+  user: AuthUser,
+  filters: {
+    type?: string;
+    q?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  },
+): Promise<Paginated<PersonRow>> {
   const pagination = resolvePagination(filters);
+  if (!(await hasAnyModuleAccess(user, 'read'))) {
+    return { data: [], page: pagination.page, pageSize: pagination.pageSize, total: 0 };
+  }
   const params: unknown[] = [];
   const conditions: string[] = ['TRUE'];
 
@@ -94,6 +107,18 @@ export async function getPersonWithCompleteness(id: string): Promise<PersonRow> 
   const person = await getPerson(id);
   const completeness = await getCompleteness(id, person.type_code as string);
   return { ...person, completeness };
+}
+
+/**
+ * Ficha de una persona para un usuario concreto. Quien no tiene ninguna
+ * dependencia no distingue una persona inexistente de una que no puede ver,
+ * igual que ocurre con `GET /documents/:id`.
+ */
+export async function getPersonForUser(user: AuthUser, id: string): Promise<PersonRow> {
+  if (!(await hasAnyModuleAccess(user, 'read'))) {
+    throw ApiError.notFound('La persona no existe o no tienes acceso a ella.');
+  }
+  return getPersonWithCompleteness(id);
 }
 
 export async function createPerson(user: AuthUser, input: Record<string, unknown>): Promise<PersonRow> {
@@ -188,11 +213,22 @@ export async function updatePerson(id: string, updates: Record<string, unknown>)
   return getPersonWithCompleteness(id);
 }
 
-export async function listPersonExpedientes(id: string) {
+/** Expedientes de una persona, limitados a los módulos que el usuario puede leer. */
+export async function listPersonExpedientes(user: AuthUser, id: string) {
+  if (user.role.has_full_access) {
+    return many(
+      `SELECT e.*, (SELECT count(*)::int FROM expediente_documents ed WHERE ed.expediente_id = e.id) AS document_count
+         FROM expedientes e WHERE e.person_id = $1 ORDER BY e.created_at DESC`,
+      [id],
+    );
+  }
+  const modules = await readableModuleCodes(user);
   return many(
     `SELECT e.*, (SELECT count(*)::int FROM expediente_documents ed WHERE ed.expediente_id = e.id) AS document_count
-       FROM expedientes e WHERE e.person_id = $1 ORDER BY e.created_at DESC`,
-    [id],
+       FROM expedientes e
+      WHERE e.person_id = $1 AND e.module_code = ANY($2::text[])
+      ORDER BY e.created_at DESC`,
+    [id, modules],
   );
 }
 

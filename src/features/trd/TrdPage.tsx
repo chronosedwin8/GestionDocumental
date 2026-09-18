@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { Dialog } from '@/components/ui/Dialog';
 import { FormField } from '@/components/ui/FormField';
+import { IfFeature } from '@/components/ui/IfFeature';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
@@ -164,22 +165,26 @@ export default function TrdPage({ embedded = false }: TrdPageProps): React.JSX.E
   const actions = (
     <>
       <HelpButton slug="ciclo-documental" contextLabel="TRD" label="Ayuda de la TRD" />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => void exportTrd('xlsx')}
-        icon={<Download className="h-3.5 w-3.5" />}
-      >
-        Exportar
-      </Button>
-      {canEdit && (
+      <IfFeature code="TRD_EXPORT">
         <Button
-          variant="primary"
-          onClick={() => setForm({ ...EMPTY_FORM, module_code: moduleFilter || activeModules[0]?.code || '' })}
-          icon={<Plus className="h-4 w-4" />}
+          size="sm"
+          variant="outline"
+          onClick={() => void exportTrd('xlsx')}
+          icon={<Download className="h-3.5 w-3.5" />}
         >
-          Nueva regla
+          Exportar
         </Button>
+      </IfFeature>
+      {canEdit && (
+        <IfFeature code="TRD_EDIT">
+          <Button
+            variant="primary"
+            onClick={() => setForm({ ...EMPTY_FORM, module_code: moduleFilter || activeModules[0]?.code || '' })}
+            icon={<Plus className="h-4 w-4" />}
+          >
+            Nueva regla
+          </Button>
+        </IfFeature>
       )}
     </>
   );
@@ -285,7 +290,11 @@ export default function TrdPage({ embedded = false }: TrdPageProps): React.JSX.E
           }
         >
           <div className="space-y-3">
-            <FormField label="Dependencia" required>
+            <FormField
+              label="Dependencia"
+              required
+              hint="Solo aparecen las dependencias donde puedes escribir: mover una regla a otra dependencia sin permiso devuelve 403."
+            >
               <Select
                 value={form.module_code}
                 onChange={(e) => setForm({ ...form, module_code: e.target.value })}

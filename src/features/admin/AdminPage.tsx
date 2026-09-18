@@ -13,6 +13,7 @@ import {
   Settings,
   Shield,
   Tag,
+  ToggleRight,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ import { DeletionsTab } from './tabs/DeletionsTab';
 import { HelpTab } from './tabs/HelpTab';
 import { LoansTab } from './tabs/LoansTab';
 import { PeriodsTab } from './tabs/PeriodsTab';
+import { FeaturesTab } from './tabs/FeaturesTab';
 import { RolesTab } from './tabs/RolesTab';
 import { StorageTab } from './tabs/StorageTab';
 import { SystemTab } from './tabs/SystemTab';
@@ -58,6 +60,13 @@ const TAB_DEFS: AdminTabDef[] = [
     label: 'Roles y permisos',
     icon: <Shield className="h-3.5 w-3.5" aria-hidden />,
     render: () => <RolesTab />,
+  },
+  {
+    id: 'caracteristicas',
+    label: 'Características por rol',
+    icon: <ToggleRight className="h-3.5 w-3.5" aria-hidden />,
+    fullAccessOnly: true,
+    render: () => <FeaturesTab />,
   },
   {
     id: 'trd',

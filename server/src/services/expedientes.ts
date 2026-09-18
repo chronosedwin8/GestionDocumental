@@ -1,7 +1,7 @@
 import { many, one, query, withTransaction } from '../db/pool.js';
 import { ApiError } from '../lib/errors.js';
 import { resolvePagination, type Paginated } from '../lib/pagination.js';
-import { canAccessModule, expedienteAccessClause, type AuthUser } from './access.js';
+import { canAccessModule, canReadDocument, expedienteAccessClause, type AuthUser } from './access.js';
 import { requireModule } from './catalogs.js';
 import { addBusinessDays } from './system.js';
 import { createNotification } from './notifications.js';
@@ -314,6 +314,17 @@ export async function addDocuments(user: AuthUser, id: string, documentIds: stri
   }
   if (expediente.estado !== 'ABIERTO') {
     throw ApiError.conflict('Solo se pueden agregar documentos a expedientes abiertos.');
+  }
+
+  // Pertenecer a un expediente accesible concede lectura del documento
+  // (contrato §Semántica de acceso, regla 4). Sin esta comprobación, incluir un
+  // documento ajeno en un expediente propio es una escalada de lectura (DEF-04).
+  for (const documentId of documentIds) {
+    if (!(await canReadDocument(user, documentId))) {
+      throw ApiError.forbidden(
+        'No puedes incluir en el expediente un documento al que no tienes acceso de lectura.',
+      );
+    }
   }
 
   await withTransaction(async (client) => {

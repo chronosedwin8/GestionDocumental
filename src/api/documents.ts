@@ -110,11 +110,16 @@ export function approveDocument(id: string, reason?: string): Promise<ApiDocumen
   return api.post<ApiDocument>(`/documents/${id}/approve`, reason ? { reason } : {});
 }
 
-export function transferDocument(
-  id: string,
-  to?: 'ARCHIVO_CENTRAL' | 'ARCHIVO_HISTORICO',
-): Promise<ApiDocument> {
-  return api.post<ApiDocument>(`/documents/${id}/transfer`, to ? { to } : {});
+/**
+ * Avanza un paso en la secuencia archivística.
+ *
+ * **No se envía `to`.** Desde la corrección de seguridad del servidor
+ * (`server/CONTRACT_NOTES.md §9`) un destino que no sea el paso siguiente
+ * devuelve 409 `CONFLICT`; la secuencia vive en `document_statuses`, así que
+ * la decide el servidor y el cliente solo muestra el destino previsto.
+ */
+export function transferDocument(id: string): Promise<ApiDocument> {
+  return api.post<ApiDocument>(`/documents/${id}/transfer`, {});
 }
 
 export function trashDocument(id: string, reason: string): Promise<void> {
