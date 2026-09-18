@@ -45,25 +45,25 @@ export function ModuleTab(): React.JSX.Element {
             <div className="panel p-4">
               <p className="text-[11px] uppercase tracking-wide text-content-muted">Documentos</p>
               <p className="mt-1 font-display text-2xl font-bold text-content-primary">
-                {formatNumber(stats.data.total_documents)}
+                {formatNumber(stats.data.kpis.total)}
               </p>
             </div>
             <div className="panel p-4">
               <p className="text-[11px] uppercase tracking-wide text-content-muted">Este mes</p>
               <p className="mt-1 font-display text-2xl font-bold text-content-primary">
-                {formatNumber(stats.data.documents_this_month)}
+                {formatNumber(stats.data.kpis.this_month)}
               </p>
             </div>
             <div className="panel p-4">
               <p className="text-[11px] uppercase tracking-wide text-content-muted">Sin foliar</p>
               <p className="mt-1 font-display text-2xl font-bold text-state-warning">
-                {formatNumber(stats.data.without_folio)}
+                {formatNumber(stats.data.kpis.without_folio)}
               </p>
             </div>
             <div className="panel p-4">
               <p className="text-[11px] uppercase tracking-wide text-content-muted">Sin TRD</p>
               <p className="mt-1 font-display text-2xl font-bold text-state-danger">
-                {formatNumber(stats.data.without_trd)}
+                {formatNumber(stats.data.kpis.without_trd)}
               </p>
             </div>
           </div>
@@ -108,7 +108,7 @@ export function ModuleTab(): React.JSX.Element {
           <section className="panel">
             <h2 className="mb-2 font-display text-base text-content-primary">Almacenamiento</h2>
             <p className="font-mono text-lg text-content-primary">
-              {formatBytes(stats.data.storage_bytes)}
+              {formatBytes(stats.data.kpis.bytes)}
             </p>
           </section>
         </>

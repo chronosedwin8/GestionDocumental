@@ -12,6 +12,7 @@ import * as authApi from '@/api/auth';
 import {
   ApiError,
   refreshAccessToken,
+  refreshSession,
   setAccessToken,
   setUnauthorizedHandler,
 } from '@/api/client';
@@ -110,7 +111,16 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
 
     void (async () => {
       try {
-        const res = await authApi.refresh();
+        // Se usa `refreshSession` y no `authApi.refresh` porque comparte la
+        // petición entre llamadas concurrentes. En desarrollo React monta el
+        // efecto dos veces y, al rotar el servidor el token de refresco, la
+        // segunda llamada llegaría con uno revocado y devolvería al login.
+        const res = await refreshSession();
+        if (cancelled) return;
+        if (!res) {
+          setAccessToken(null);
+          return;
+        }
         setAccessToken(res.accessToken);
         const me = await authApi.me();
         if (cancelled) return;

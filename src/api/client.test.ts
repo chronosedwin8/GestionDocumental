@@ -7,6 +7,7 @@ import {
   setAccessToken,
   setUnauthorizedHandler,
   streamSse,
+  refreshSession,
 } from './client';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -200,5 +201,43 @@ describe('api/client', () => {
     expect(tokens.join('')).toBe('Según el acta, el plazo vence el 30 de junio.');
     expect(sources).toEqual([{ quote: 'el plazo vence el 30 de junio', offset: 420 }]);
     expect(done).toBe(true);
+  });
+});
+
+describe('refreshSession — deduplicación', () => {
+  it('dos llamadas simultáneas comparten una sola petición al servidor', async () => {
+    // El servidor rota el token de refresco: si el arranque lo pidiera dos
+    // veces, la segunda llegaría con uno revocado y cerraría la sesión.
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ accessToken: 'nuevo', expiresIn: 900 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const [a, b] = await Promise.all([refreshSession(), refreshSession()]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(a).toEqual({ accessToken: 'nuevo', expiresIn: 900 });
+    expect(b).toEqual(a);
+  });
+
+  it('devuelve la vigencia además del token, para programar el refresco', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ accessToken: 'tok', expiresIn: 1200 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(refreshSession()).resolves.toEqual({ accessToken: 'tok', expiresIn: 1200 });
+  });
+
+  it('devuelve null si el servidor rechaza la renovación', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
+    await expect(refreshSession()).resolves.toBeNull();
   });
 });

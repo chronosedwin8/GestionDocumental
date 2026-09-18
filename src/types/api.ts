@@ -738,18 +738,32 @@ export interface DashboardStats {
   retention_semaphore: { module_code: string; total: number; alerts: number }[];
 }
 
+/** Cifras con nombre que emite `GET /stats/general`. El rótulo lo pone la interfaz. */
 export interface GeneralStats {
-  kpis: { label: string; value: number | string; hint?: string }[];
-  trd_compliance: { module_code: string; total: number; with_trd: number }[];
-  retention_semaphore: { module_code: string; ok: number; warning: number; critical: number }[];
-  loans: { active: number; overdue: number; returned: number };
-  expedientes: { abiertos: number; cerrados: number; transferidos: number };
+  kpis: {
+    total_documents: number;
+    documents_this_month: number;
+    documents_this_year: number;
+    total_bytes: number;
+    with_trd: number;
+    with_folio: number;
+    total_expedientes: number;
+    open_expedientes: number;
+    active_loans: number;
+    overdue_loans: number;
+    trashed: number;
+    active_users: number;
+  };
+  by_module: { module_code: string; name: string; total: number; alerts: number; without_trd: number }[];
+  by_status: CodeTotal[];
+  by_disposition: CodeTotal[];
+  trd_compliance: { total: number; with_trd: number; with_folio: number };
 }
 
 export interface TrendStats {
   timeline: { month: string; total: number }[];
   by_module_type: { module_code: string; type: string; total: number }[];
-  speed: { month: string; avg_days: number }[];
+  speed: { avg_days_to_update: number; avg_file_size: number };
   top_types: { type: string; total: number }[];
 }
 
@@ -763,13 +777,19 @@ export interface AlertStats {
 
 export interface ModuleStats {
   module_code: string;
-  total_documents: number;
-  documents_this_month: number;
-  by_status: CodeTotal[];
+  kpis: {
+    total: number;
+    this_month: number;
+    without_folio: number;
+    without_trd: number;
+    alerts: number;
+    bytes: number;
+    expedientes: number;
+    active_loans: number;
+  };
   by_type: { type: string; total: number }[];
-  without_folio: number;
-  without_trd: number;
-  storage_bytes: number | null;
+  by_status: CodeTotal[];
+  monthly: { month: string; total: number }[];
 }
 
 export type MonthlyStatsRow = { month: string } & Record<string, string | number>;

@@ -53,16 +53,23 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 
 /* ---------------------------------------------------------------- refresh */
 
-let refreshPromise: Promise<string | null> | null = null;
+export type RefreshOutcome = { accessToken: string; expiresIn: number } | null;
+
+let refreshPromise: Promise<RefreshOutcome> | null = null;
 
 /**
  * Pide un access token nuevo. Las llamadas concurrentes comparten la misma
  * promesa: sólo se dispara un `POST /auth/refresh`.
+ *
+ * Compartirla no es una optimización, es obligatorio: el servidor **rota** el
+ * token de refresco y revoca el anterior, así que dos peticiones simultáneas
+ * harían que la segunda llegara con uno ya revocado y cerrarían la sesión.
+ * Todo el cliente —incluido el arranque de la aplicación— debe pasar por aquí.
  */
-export function refreshAccessToken(): Promise<string | null> {
+export function refreshSession(): Promise<RefreshOutcome> {
   if (refreshPromise) return refreshPromise;
 
-  refreshPromise = (async (): Promise<string | null> => {
+  refreshPromise = (async (): Promise<RefreshOutcome> => {
     try {
       const res = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
@@ -73,7 +80,7 @@ export function refreshAccessToken(): Promise<string | null> {
       const body = (await res.json()) as RefreshResponse;
       if (!body?.accessToken) return null;
       accessToken = body.accessToken;
-      return body.accessToken;
+      return { accessToken: body.accessToken, expiresIn: body.expiresIn };
     } catch {
       return null;
     } finally {
@@ -87,6 +94,11 @@ export function refreshAccessToken(): Promise<string | null> {
   })();
 
   return refreshPromise;
+}
+
+/** Compatibilidad: sólo el token, para los reintentos tras un 401. */
+export async function refreshAccessToken(): Promise<string | null> {
+  return (await refreshSession())?.accessToken ?? null;
 }
 
 /* -------------------------------------------------------------- utilidades */

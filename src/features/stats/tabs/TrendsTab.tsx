@@ -11,7 +11,7 @@ import * as statsApi from '@/api/stats';
 import { useQuery } from '@/hooks/useQuery';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { formatNumber } from '@/lib/format';
+import { formatBytes, formatNumber } from '@/lib/format';
 
 const CHART_TOOLTIP = {
   background: 'var(--surface-overlay)',
@@ -60,31 +60,27 @@ export function TrendsTab(): React.JSX.Element {
       </section>
 
       <section className="panel">
-        <h2 className="mb-4 font-display text-base text-content-primary">
-          Velocidad de radicación (días promedio)
-        </h2>
-        {data.speed.length === 0 ? (
-          <p className="text-sm text-content-muted">Sin datos.</p>
-        ) : (
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.speed} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} stroke="var(--border-default)" />
-                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} stroke="var(--border-default)" />
-                <Tooltip contentStyle={CHART_TOOLTIP} />
-                <Line
-                  type="monotone"
-                  dataKey="avg_days"
-                  name="Días promedio"
-                  stroke="var(--color-info)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+        <h2 className="mb-4 font-display text-base text-content-primary">Ritmo de trabajo</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-content-muted">
+              Días promedio hasta la última modificación
+            </p>
+            <p className="mt-1 font-display text-2xl font-bold text-content-primary">
+              {formatNumber(Math.round(data.speed.avg_days_to_update))}
+            </p>
+            <p className="mt-1 text-[11px] text-content-muted">
+              Cuánto tiempo sigue cambiando un documento después de radicarse.
+            </p>
           </div>
-        )}
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-content-muted">Tamaño promedio del archivo</p>
+            <p className="mt-1 font-display text-2xl font-bold text-content-primary">
+              {formatBytes(data.speed.avg_file_size)}
+            </p>
+            <p className="mt-1 text-[11px] text-content-muted">Sirve para estimar el almacenamiento futuro.</p>
+          </div>
+        </div>
       </section>
 
       <section className="panel">
