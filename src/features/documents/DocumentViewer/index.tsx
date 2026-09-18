@@ -24,6 +24,7 @@ import { useCatalogs } from '@/contexts/CatalogContext';
 import { useDialogs } from '@/contexts/DialogContext';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { invalidatePrefix } from '@/hooks/useQuery';
+import { AiStatusIndicator } from '@/components/ai/AiStatusIndicator';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Badge } from '@/components/ui/Badge';
 import { BookmarkButton } from '@/components/ui/BookmarkButton';
@@ -260,9 +261,21 @@ export function DocumentViewer({
             className="flex-shrink-0 px-2"
           />
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {tab === 'info' && <InfoTab document={document} canWrite={writable} onUpdated={apply} />}
+            {tab === 'info' && (
+              <InfoTab
+                document={document}
+                canWrite={writable}
+                onUpdated={apply}
+                onRefresh={() => void refetch()}
+              />
+            )}
             {tab === 'metadata' && (
-              <MetadataTab document={document} canWrite={writable} onUpdated={apply} />
+              <MetadataTab
+                document={document}
+                canWrite={writable}
+                onUpdated={apply}
+                onRefresh={() => void refetch()}
+              />
             )}
             {tab === 'trd' && <TrdTab document={document} canWrite={writable} onUpdated={apply} />}
             {tab === 'security' && (
@@ -321,6 +334,7 @@ export function DocumentViewer({
             ) : (
               <Badge color="var(--color-warning)">Sin foliar</Badge>
             )}
+            <AiStatusIndicator status={document.ai_status} error={document.ai_error ?? null} />
           </span>
         ) : undefined
       }

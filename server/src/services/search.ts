@@ -3,12 +3,14 @@ import { resolvePagination, type Paginated } from '../lib/pagination.js';
 import { documentAccessClause, expedienteAccessClause, type AuthUser } from './access.js';
 import { mapDocument, type DocumentDto } from './documents.js';
 import { rankSemantic } from './ai.js';
-import { getConfigOr } from './system.js';
+import { snippetFor } from './aiText.js';
+import { getConfigOr, type AiSemanticConfig } from './system.js';
 
 const SELECT_DOC = `
   d.id, d.title, d.type, d.module_code, d.folio_index, d.s3_key, d.s3_bucket,
   d.file_name, d.file_type, d.file_size, d.sha256, d.page_count,
   d.status_code, d.previous_status_code, d.author_id, d.summary, d.ai_status,
+  d.ai_error, d.ai_analyzed_at,
   d.category, d.subcategory, d.person_id, d.academic_period_id, d.retention_end_date,
   d.approved_by, d.approved_at, d.approval_sha256,
   d.deleted_at, d.deleted_by, d.delete_reason, d.permanent_delete_at,
@@ -195,39 +197,200 @@ export async function advancedSearch(
   };
 }
 
-/** Preselección full-text + ranking del modelo (requiere Gemini configurado). */
+export type SemanticStrategy = 'lexical' | 'trigram' | 'module_recency';
+
+export type SemanticResult = {
+  explanation: string;
+  documents: DocumentDto[];
+  matches: { document_id: string; reason: string; score: number }[];
+  strategy: SemanticStrategy;
+  candidates_considered: number;
+};
+
+type CandidateRow = {
+  id: string;
+  title: string;
+  type: string;
+  module_code: string;
+  summary: string | null;
+  extracted_text: string | null;
+  snippet_raw: string | null;
+  score: number;
+};
+
+/**
+ * Preselección de candidatos que NO depende solo del acierto léxico:
+ *   1. full-text (`search_vector`), que ya incluye el texto extraído;
+ *   2. si no hay coincidencias, similitud `pg_trgm` sobre título, resumen,
+ *      tipo y etiquetas (encuentra variantes, errores de tecleo y plurales);
+ *   3. si aún no hay nada, ampliación EXPLÍCITA por módulo y recencia.
+ * Cada candidato lleva un fragmento REAL del texto extraído relevante a la
+ * consulta (`ts_headline`), no solo el resumen.
+ */
+async function semanticCandidates(
+  user: AuthUser,
+  queryText: string,
+  moduleCode: string | undefined,
+  limit: number,
+  trigramThreshold: number,
+): Promise<{ rows: CandidateRow[]; strategy: SemanticStrategy }> {
+  const runQuery = async (mode: SemanticStrategy): Promise<CandidateRow[]> => {
+    const params: unknown[] = [queryText];
+    const conditions: string[] = ['d.deleted_at IS NULL'];
+
+    if (moduleCode) {
+      params.push(moduleCode);
+      conditions.push(`d.module_code = $${params.length}`);
+    }
+
+    if (mode === 'lexical') {
+      conditions.push(`d.search_vector @@ plainto_tsquery('spanish', unaccent($1))`);
+    } else if (mode === 'trigram') {
+      params.push(trigramThreshold);
+      const th = params.length;
+      conditions.push(`(
+        similarity(unaccent(lower(d.title)), unaccent(lower($1))) >= $${th}
+        OR similarity(unaccent(lower(coalesce(d.summary, ''))), unaccent(lower($1))) >= $${th}
+        OR similarity(unaccent(lower(d.type)), unaccent(lower($1))) >= $${th}
+        OR EXISTS (
+          SELECT 1 FROM document_tags t
+           WHERE t.document_id = d.id
+             AND similarity(unaccent(lower(t.tag)), unaccent(lower($1))) >= $${th}
+        )
+      )`);
+    }
+
+    conditions.push(await documentAccessClause(user, params));
+
+    const scoreExpr =
+      mode === 'lexical'
+        ? `ts_rank(d.search_vector, plainto_tsquery('spanish', unaccent($1)))`
+        : mode === 'trigram'
+          ? `GREATEST(
+               similarity(unaccent(lower(d.title)), unaccent(lower($1))),
+               similarity(unaccent(lower(coalesce(d.summary, ''))), unaccent(lower($1))),
+               similarity(unaccent(lower(d.type)), unaccent(lower($1)))
+             )`
+          : '0';
+
+    const orderExpr = mode === 'module_recency' ? 'd.created_at DESC' : 'score DESC, d.created_at DESC';
+
+    params.push(limit);
+
+    return many<CandidateRow>(
+      `SELECT d.id, d.title, d.type, d.module_code, d.summary, d.extracted_text,
+              ${scoreExpr} AS score,
+              CASE WHEN d.extracted_text IS NULL THEN NULL ELSE
+                ts_headline('spanish', left(d.extracted_text, 200000),
+                            plainto_tsquery('spanish', unaccent($1)),
+                            'MaxWords=80, MinWords=25, ShortWord=3, MaxFragments=3, FragmentDelimiter=" … ", StartSel="", StopSel="", HighlightAll=FALSE')
+              END AS snippet_raw
+         FROM documents d
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY ${orderExpr}
+        LIMIT $${params.length}`,
+      params,
+    );
+  };
+
+  let rows = await runQuery('lexical');
+  if (rows.length > 0) return { rows, strategy: 'lexical' };
+
+  rows = await runQuery('trigram');
+  if (rows.length > 0) return { rows, strategy: 'trigram' };
+
+  rows = await runQuery('module_recency');
+  return { rows, strategy: 'module_recency' };
+}
+
+/**
+ * Búsqueda semántica sobre el CONTENIDO: preselección robusta + ranking del
+ * modelo con un fragmento real de cada documento. Devuelve el motivo y la
+ * puntuación por documento. Requiere Gemini configurado.
+ */
 export async function semanticSearch(
   user: AuthUser,
   queryText: string,
   moduleCode?: string,
-): Promise<{ explanation: string; documents: DocumentDto[] }> {
+): Promise<SemanticResult> {
   const maxCandidates = await getConfigOr<number>('semantic_candidates', 40);
-  const candidates = await fullTextSearch(user, {
-    q: queryText,
-    module: moduleCode,
-    page: 1,
-    pageSize: Math.min(100, maxCandidates),
+  const cfg = await getConfigOr<AiSemanticConfig>('ai_semantic', {
+    snippet_chars: 600,
+    max_candidates_to_model: 24,
+    trigram_threshold: 0.18,
+    min_score: 0.2,
   });
 
-  let pool = candidates.data;
-  if (pool.length === 0) {
-    // Sin coincidencias léxicas: se ofrecen los más recientes accesibles como contexto.
-    const recent = await fullTextSearch(user, { q: '', module: moduleCode, page: 1, pageSize: Math.min(100, maxCandidates) });
-    pool = recent.data;
+  const { rows, strategy } = await semanticCandidates(
+    user,
+    queryText,
+    moduleCode,
+    Math.min(100, maxCandidates),
+    cfg.trigram_threshold ?? 0.18,
+  );
+
+  if (rows.length === 0) {
+    return {
+      explanation: 'No hay documentos accesibles para esta consulta.',
+      documents: [],
+      matches: [],
+      strategy,
+      candidates_considered: 0,
+    };
   }
-  if (pool.length === 0) return { explanation: 'No hay documentos accesibles para esta consulta.', documents: [] };
+
+  const snippetChars = cfg.snippet_chars ?? 600;
+  const toModel = rows.slice(0, Math.max(1, cfg.max_candidates_to_model ?? 24));
 
   const ranked = await rankSemantic(
     queryText,
-    pool.map((d) => ({ id: d.id, title: d.title, summary: d.summary })),
+    toModel.map((row) => {
+      const headline = (row.snippet_raw ?? '').trim();
+      const snippet =
+        headline.length > 0
+          ? headline.slice(0, snippetChars)
+          : snippetFor(row.extracted_text ?? '', queryText, snippetChars);
+      return {
+        id: row.id,
+        title: row.title,
+        type: row.type,
+        module_code: row.module_code,
+        summary: row.summary,
+        snippet,
+      };
+    }),
+    { userId: user.id },
   );
 
-  const byId = new Map(pool.map((d) => [d.id, d]));
-  const documents = ranked.relevantDocumentIds
-    .map((id) => byId.get(id))
-    .filter((d): d is DocumentDto => Boolean(d));
+  const ids = ranked.matches.map((m) => m.document_id);
+  if (ids.length === 0) {
+    return {
+      explanation: ranked.explanation || 'Ningún documento accesible responde a la consulta.',
+      documents: [],
+      matches: [],
+      strategy,
+      candidates_considered: toModel.length,
+    };
+  }
 
-  return { explanation: ranked.explanation, documents };
+  // Se recuperan los documentos completos (etiquetas y metadatos incluidos)
+  // y se devuelven en el orden que decidió el modelo.
+  const docParams: unknown[] = [ids];
+  const access = await documentAccessClause(user, docParams);
+  const full = await many(
+    `SELECT ${SELECT_DOC} FROM documents d ${JOINS}
+      WHERE d.id = ANY($1::uuid[]) AND d.deleted_at IS NULL AND ${access}`,
+    docParams,
+  );
+  const byId = new Map(full.map((row) => [row.id as string, mapDocument(row)]));
+
+  return {
+    explanation: ranked.explanation,
+    documents: ids.map((id) => byId.get(id)).filter((d): d is DocumentDto => Boolean(d)),
+    matches: ranked.matches.filter((m) => byId.has(m.document_id)),
+    strategy,
+    candidates_considered: toModel.length,
+  };
 }
 
 export async function globalSearch(user: AuthUser, term: string) {

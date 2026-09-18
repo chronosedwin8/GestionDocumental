@@ -18,7 +18,7 @@ import {
   deleteMetadata,
   downloadDocument,
   downloadVersion,
-  enqueueAiAnalysis,
+  analyzeDocumentNow,
   getDocumentForUser,
   getDocumentText,
   getDocumentTrd,
@@ -42,7 +42,7 @@ import {
 } from '../services/documents.js';
 import { createLoan } from '../services/loans.js';
 import { purgeFromTrash } from '../services/trash.js';
-import { getConfigOr, isAiConfigured } from '../services/system.js';
+import { getConfigOr, isAiEnabled } from '../services/system.js';
 import { query } from '../db/pool.js';
 import { param } from '../lib/params.js';
 
@@ -409,15 +409,27 @@ documentsRouter.get('/:id/custody', async (req: Request, res: Response) => {
 
 // ── IA ──────────────────────────────────────────────────────
 
-documentsRouter.post('/:id/ai/analyze', async (req: Request, res: Response) => {
-  const user = currentUser(req);
-  await getDocumentForUser(user, param(req, 'id'));
-  if (!isAiConfigured()) throw ApiError.aiNotConfigured();
-  await query('UPDATE documents SET ai_status = $2 WHERE id = $1', [param(req, 'id'), 'PENDING']);
-  enqueueAiAnalysis(param(req, 'id'));
-  await audit(req, 'QUEUE_AI_ANALYSIS', 'document', param(req, 'id'), {});
-  res.json({ ai_status: 'PENDING' });
-});
+const analyzeBodySchema = z.object({ include_metadata: z.boolean().optional().default(false) });
+
+documentsRouter.post(
+  '/:id/ai/analyze',
+  validateBody(analyzeBodySchema),
+  async (req: Request, res: Response) => {
+    const user = currentUser(req);
+    const id = param(req, 'id');
+    if (!(await isAiEnabled())) throw ApiError.aiNotConfigured();
+    const body = req.body as z.infer<typeof analyzeBodySchema>;
+
+    const result = await analyzeDocumentNow(user, id, { includeMetadata: body.include_metadata });
+    await audit(req, 'AI_ANALYZE', 'document', id, {
+      chunks: result.chunks,
+      analyzed_chars: result.analyzed_chars,
+      total_chars: result.total_chars,
+      cached: result.cached,
+    });
+    res.json({ summary: result.summary, tags: result.tags, ai_status: result.ai_status });
+  },
+);
 
 // ── TRD por documento ───────────────────────────────────────
 

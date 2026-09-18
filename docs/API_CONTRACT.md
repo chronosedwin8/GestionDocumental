@@ -33,7 +33,7 @@ type Document = {
   id: string; title: string; type: string; module_code: string; folio_index: string|null;
   s3_key: string; s3_bucket: string; file_name: string; file_type: string; file_size: number; sha256: string|null; page_count: number|null;
   status_code: string; author_id: string|null; author?: { id: string; full_name: string; email: string }|null;
-  summary: string|null; ai_status: 'PENDING'|'DONE'|'FAILED'|'SKIPPED'; category: string|null; subcategory: string|null;
+  summary: string|null; ai_status: 'PENDING'|'DONE'|'FAILED'|'SKIPPED'; ai_error: string|null; ai_analyzed_at: string|null; category: string|null; subcategory: string|null;
   person_id: string|null; academic_period_id: string|null; retention_end_date: string|null;
   approved_by: string|null; approved_at: string|null; approval_sha256: string|null;
   deleted_at: string|null; delete_reason: string|null; permanent_delete_at: string|null;
@@ -230,8 +230,11 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 
 ## IA — `/ai`
 
-| POST | `/ai/analyze` | `{ document_id }` → `{ summary, tags }` (síncrono; lo usa el job y el botón "Regenerar"). |
-| POST | `/ai/chat` | `{ document_id, question, history?: {role,text}[] }` → **SSE** con eventos `token` (`{ text }`) y `done`. |
+> Sección ampliada al final del documento (**IA — motor ampliado**) con las rutas nuevas
+> de reconocimiento óptico, clasificación TRD, metadatos, uso y reproceso.
+
+| POST | `/ai/analyze` | `{ document_id, include_metadata?: boolean }` → `AiAnalyzeResult` (síncrono; lo usa el botón "Regenerar"). |
+| POST | `/ai/chat` | `{ document_id, question, history?: {role,text}[] }` → **SSE** con eventos `token` (`{ text }`), `sources` (`{ sources: {quote,offset}[] }`) y `done`. |
 
 ## Semántica de acceso (obligatoria en backend y asumida por frontend)
 
@@ -250,3 +253,110 @@ type JobRun = { id: string; job: string; started_at: string; finished_at: string
 
 Servidor (`server/.env`): `PORT=4000`, `DATABASE_URL=postgres://postgres:1004@localhost:5432/eduarchive`, `DATABASE_URL_TEST`, `JWT_SECRET`, `JWT_ACCESS_TTL=15m`, `REFRESH_TTL_DAYS=14`, `APP_ENCRYPTION_KEY` (32 bytes base64), `CORS_ORIGINS=http://localhost:3000`, `GEMINI_API_KEY` (opcional), `GEMINI_MODEL=gemini-2.0-flash`, `SMTP_*` (opcional; también configurable en BD), `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`, `LOG_LEVEL`, `NODE_ENV`.
 Cliente (`.env.local`): `VITE_API_URL=http://localhost:4000/api`.
+
+---
+
+## IA — motor ampliado (`/ai`)
+
+Implementa `docs/AI_ANALISIS.md` §3 y §4. Todas las rutas exigen sesión. Sin clave de Gemini
+(`env.GEMINI_API_KEY` o `system_config.gemini_api_key`, cifrada) responden **503
+`AI_NOT_CONFIGURED`**: nunca se simulan resúmenes, etiquetas, clasificaciones ni metadatos.
+**La IA sugiere, la persona decide**: ninguna ruta de IA cambia por su cuenta el tipo
+documental, la serie ni la retención de un documento.
+
+### Tipos
+
+```ts
+type AiSuggestion = { value: string; confidence: number; reason: string; uncertain?: boolean };
+// `uncertain = confidence < system_config.ai_confidence_threshold`
+
+type AiClassification = {
+  document_type: AiSuggestion[];      // hasta ai_suggestions_per_field; value ∈ retention_rules.document_type
+  serie:         AiSuggestion[];      // value ∈ document_categories (raíz del módulo)
+  subserie:      AiSuggestion[];      // value ∈ document_categories (hijas del módulo)
+  module_code:   AiSuggestion | null; // solo si el contenido sugiere otra dependencia
+};
+
+type AiExtractedField = { key: string; value: string; confidence: number; uncertain?: boolean };
+// `key` ∈ system_config.ai_metadata_fields
+
+type AiAnalyzeResult = {
+  summary: string | null; tags: string[]; ai_status: 'DONE'|'FAILED'|'SKIPPED'|'PENDING';
+  ai_error: string | null;
+  chunks: number; analyzed_chars: number; total_chars: number;   // trazabilidad del troceado
+  cached: boolean; usage: { input: number; output: number };
+  metadata?: AiExtractedField[];
+  metadata_persisted?: { saved: number; skipped_human: string[] };
+};
+
+type AiUsageRow = {
+  operation: 'ANALYZE'|'CLASSIFY'|'EXTRACT_METADATA'|'OCR'|'SEMANTIC'|'CHAT';
+  calls: number; input_tokens: number; output_tokens: number; cached_hits: number;
+};
+
+type AiOcrResult = {
+  text_chars: number; page_count: number | null; pages_processed: number;
+  cached: boolean; usage: { input: number; output: number };
+  message?: string;   // presente cuando no se reconoció texto
+};
+```
+
+### Rutas
+
+| Método | Ruta | Cuerpo / query | Respuesta |
+|---|---|---|---|
+| POST | `/ai/ocr` | `{ document_id, force?: boolean }` | `AiOcrResult`. Descarga de S3, reconoce el texto con el modelo de visión, guarda en `documents.extracted_text`, refresca `search_vector` (trigger) y registra custodia `OCR`. Exige **escritura** sobre el documento. **409 `ALREADY_HAS_TEXT`** si ya tiene texto y no se envía `force: true`. **422** si el formato no admite visión (`system_config.ai_ocr_mime_types`) o si el archivo supera `ai_ocr_max_file_mb`. Si no se reconoce texto, `text_chars = 0`, `extracted_text` queda **nulo** y se devuelve `message`. |
+| POST | `/ai/classify` | `{ document_id }` **o** `{ module_code, file_name, text }` | `AiClassification`. El prompt recibe el catálogo REAL del módulo (`retention_rules` + `document_categories`); toda propuesta fuera del catálogo se descarta al validar. La segunda forma permite sugerir **antes** de guardar, desde el asistente de carga (exige lectura del módulo). **422 `NO_TEXT`** si el documento no tiene texto. |
+| POST | `/ai/extract-metadata` | `{ document_id, persist?: boolean }` (por defecto `true`) | `{ fields: AiExtractedField[], persisted: { saved, skipped_human } \| null }`. Con `persist` los guarda en `document_metadata` con `is_extracted = true` y su confianza. **Nunca pisa un valor escrito por una persona** (`is_extracted = false`): esas claves aparecen en `skipped_human`. Con `persist` exige **escritura**. |
+| POST | `/ai/analyze` | `{ document_id, include_metadata?: boolean }` | `AiAnalyzeResult`. Analiza el documento **completo** por bloques con solapamiento y consolidación final. |
+| POST | `/ai/reprocess` | `{ scope: 'FAILED'\|'PENDING'\|'NO_TEXT'\|'ALL', module_code?, limit? }` | `{ queued, scope, jobs: { analyze, ocr } }`. Los documentos sin texto se encolan como OCR y el resto como análisis. Solo administración (`roles.has_full_access`). |
+| GET | `/ai/usage` | query `from`, `to` (por defecto, últimos 30 días) | `{ rows: AiUsageRow[], totals: { calls, input_tokens, output_tokens, cached_hits, failed, estimated_cost, currency }, period: {from,to} }`. Tokens **reales** de `usageMetadata` de Gemini; el costo se estima con `system_config.ai_pricing`. Solo administración. |
+| GET | `/ai/health` | — | `{ configured, model, vision_model, queue_depth, failed_last_24h, pending, without_text, cache_entries, metadata_fields }`. Responde 200 aunque la IA no esté configurada. |
+| POST | `/ai/chat` | `{ document_id, question, history? }` | **SSE**: `token` (`{ text }`) → `sources` (`{ sources: { quote, offset }[] }`) → `done`. En caso de fallo, `error` (`{ message }`). |
+
+### Cambios en rutas existentes
+
+- **`POST /search/semantic`** devuelve además `matches: { document_id, reason, score }[]`,
+  `strategy: 'lexical'|'trigram'|'module_recency'` y `candidates_considered`. La preselección
+  ya no depende solo del acierto léxico: full-text → `pg_trgm` → ampliación explícita por
+  módulo y recencia; cada candidato viaja al modelo con un **fragmento real** del texto
+  extraído (`ts_headline`), no solo con el resumen.
+- **`POST /ai/chat`** emite el evento final `sources` con citas **verificables**: `quote` es
+  texto que existe literalmente en `documents.extracted_text` y `offset` es su desplazamiento
+  real en esa cadena. El contexto se elige por relevancia a la pregunta, no cortando por el
+  principio del documento.
+- **`POST /documents/:id/ai/analyze`** acepta `{ include_metadata?: boolean }` y devuelve
+  `{ summary, tags, ai_status }` (antes solo encolaba y devolvía `{ ai_status: 'PENDING' }`).
+- **`GET /documents/:id/text`** devuelve además `total_chars`.
+- **`Document`** gana `ai_error: string | null` y `ai_analyzed_at: string | null`.
+  `ai_status` **nunca** queda en `DONE` con un resumen de error: ante un fallo pasa a `FAILED`
+  con el motivo en `ai_error`.
+
+### Configuración (`system_config`, editable por `PUT /system/config/:key`)
+
+| Clave | Por defecto | Para qué |
+|---|---|---|
+| `gemini_api_key` *(secreta)* | `null` | Clave de Gemini cifrada en BD; si está vacía se usa `env.GEMINI_API_KEY`. |
+| `ai_model` / `ai_vision_model` | `gemini-2.0-flash` | Modelo de texto y modelo de visión (separados). |
+| `ai_limits` | ver semilla | `analyze_chars` = **tamaño del bloque** (12.000), `analyze_max_chunks` (24), `analyze_chunk_overlap` (600), `classify_chars`, `metadata_chars`, `ocr_max_tokens`, `chat_chars`… |
+| `ai_ocr_max_pages` / `ai_ocr_max_file_mb` | `30` / `18` | Acotan el costo del reconocimiento óptico. |
+| `ai_ocr_mime_types` / `ai_ocr_auto` | PDF + imágenes / `true` | Formatos con visión y OCR automático al subir sin texto extraíble. |
+| `ai_metadata_fields` | 13 campos archivísticos | Campos que busca la extracción de metadatos. |
+| `ai_confidence_threshold` | `0.6` | Por debajo, la sugerencia se marca `uncertain`. |
+| `ai_tag_vocabulary_size` / `ai_max_tags` | `60` / `5` | Vocabulario controlado de etiquetas del módulo. |
+| `ai_suggestions_per_field` | `3` | Candidatas por campo en la clasificación. |
+| `ai_semantic` | `{snippet_chars, max_candidates_to_model, trigram_threshold, min_score}` | Preselección y ranking de la búsqueda semántica. |
+| `ai_chat_sources` | `{max_sources, min_quote_chars, max_quote_chars}` | Citas del chat. |
+| `ai_cache_enabled` / `ai_cache_ttl_days` | `true` / `30` | Caché por huella de contenido. |
+| `ai_pricing` | `{USD, 0.10, 0.40}` | Tarifa por millón de tokens para estimar el costo. |
+| `ai_reprocess_max` | `200` | Tope de `POST /ai/reprocess`. |
+| `document_text_preview_chars` | `100000` | Tope de `GET /documents/:id/text`. |
+
+### Tablas nuevas (migración `012_ai_engine.sql`)
+
+- `ai_usage(operation, model, input_tokens, output_tokens, duration_ms, document_id, user_id, cache_hit, success, created_at)`.
+- `ai_cache(cache_key = sha256(contenido normalizado) + operación + modelo + versión del prompt, payload, input_tokens, output_tokens, hits, last_used_at)`.
+- `documents.ai_error TEXT`, `documents.ai_analyzed_at TIMESTAMPTZ`.
+- Corrección de datos: los documentos cuyo resumen era el texto de error heredado
+  (`"Error al analizar documento con IA."`) pasan a `ai_status = 'FAILED'` con `summary = NULL`
+  y el motivo en `ai_error`.

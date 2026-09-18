@@ -59,7 +59,7 @@ curl http://localhost:4000/api/system/health
 | `REFRESH_TTL_DAYS` | no (14) | Vigencia del refresh token. |
 | `APP_ENCRYPTION_KEY` | **sí** | 32 bytes en base64; cifra los secretos de `system_config` (AES-256-GCM). |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` | para sembrar | Administrador inicial. |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | no | Sin clave, la IA queda deshabilitada (503 `AI_NOT_CONFIGURED`, `ai_status='SKIPPED'`). |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | no | Alternativa a `system_config.gemini_api_key` (cifrada). Sin clave en ninguno de los dos sitios, la IA queda deshabilitada (503 `AI_NOT_CONFIGURED`, `ai_status='SKIPPED'`). |
 | `SMTP_*` | no | Alternativa a `system_config.smtp_config`. Sin SMTP, el restablecimiento es manual desde el panel. |
 | `AWS_*` | no | Alternativa a `system_config.aws_config`. Sin S3, `POST /documents` responde 503 `STORAGE_NOT_CONFIGURED`. |
 | `ALLOW_DB_RESET` | no (`false`) | Habilita `npm run db:reset`. |
@@ -75,8 +75,8 @@ se guardan cifrados y se devuelven enmascarados.
 
 ```
 server/
-  db/migrations/     001_extensions … 009_stats_views   (SQL puro, idempotente)
-  db/seeds/          catálogos, matriz, config, TRD (79), categorías (121), ayuda
+  db/migrations/     001_extensions … 012_ai_engine     (SQL puro, idempotente)
+  db/seeds/          catálogos, matriz, config, TRD, categorías, ayuda, config de IA
   src/
     index.ts app.ts
     config/env.ts            validación zod de process.env
@@ -85,7 +85,12 @@ server/
     services/…               access, auth, users, catalogs, documents, storage,
                              extraction, search, expedientes, people, trd, categories,
                              loans, notifications, deletion, trash, audit, custody,
-                             stats, system, ai, help, jobs
+                             stats, system, help, jobs
+                             IA: aiClient (transporte Gemini, esquema JSON, caché, uso),
+                             ai (analyze/classify/extract/ocr/semantic/chat),
+                             aiCatalog (TRD, series, etiquetas, campos),
+                             aiText (troceado, relevancia, etiquetas, citas),
+                             aiDocuments (cola, OCR, metadatos, reproceso, salud)
     routes/…                 una por dominio, montadas en /api
     jobs/…                   markOverdueLoans, retentionAlerts, processDispositions,
                              purgeTrash, refreshStats
@@ -115,7 +120,26 @@ server/
 - **Trabajos**: `node-cron` con horarios de `system_config.jobs`; cada corrida queda en
   `job_runs`; ejecución manual con `POST /system/jobs/:job/run`.
 - **Sin simulaciones**: si falta S3 la carga se rechaza (503) y si falta Gemini la IA
-  responde 503 y los documentos quedan en `ai_status='SKIPPED'`.
+  responde 503 y los documentos quedan en `ai_status='SKIPPED'`. Si el reconocimiento
+  óptico no encuentra texto, `extracted_text` queda nulo y se informa.
+- **Motor de IA** (`docs/AI_ANALISIS.md`, contrato en `docs/API_CONTRACT.md` §«IA — motor
+  ampliado»):
+  - **Documento completo**: el análisis trocea el texto en bloques de `ai_limits.analyze_chars`
+    con solapamiento y consolida. `analyze_chars` ya **no** es un recorte del documento.
+  - **Salida estructurada**: `responseMimeType: application/json` + `responseSchema`; sin
+    parseo por expresiones regulares.
+  - **Reconocimiento óptico** (`POST /ai/ocr` y automático al subir sin texto extraíble):
+    imagen o PDF completo como `inline_data`. No se rasteriza el PDF —en Windows no hay una
+    dependencia fiable sin binarios externos ni módulos nativos—, así que el límite de páginas
+    (`ai_ocr_max_pages`) se aplica como instrucción y se informa en `pages_processed`.
+  - **Clasificación TRD y metadatos**: la IA elige del catálogo real (`retention_rules`,
+    `document_categories`, `system_config.ai_metadata_fields`); lo que no esté en el catálogo
+    se descarta en el servidor. La IA **sugiere**, la persona decide: no cambia tipo, serie ni
+    retención, y nunca pisa un metadato escrito por una persona (`is_extracted = false`).
+  - **Caché y uso**: `ai_cache` por huella de contenido y `ai_usage` con los tokens reales de
+    `usageMetadata`; `GET /ai/usage` agrega por operación y estima el costo con `ai_pricing`.
+  - **Calidad del estado**: `documents.ai_error` y `ai_analyzed_at`; `ai_status` nunca queda en
+    `DONE` con un resumen de error. `POST /ai/reprocess` y `GET /ai/health` para administración.
 
 ## Operación en Windows
 

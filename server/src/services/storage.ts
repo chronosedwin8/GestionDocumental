@@ -119,6 +119,15 @@ export async function uploadBuffer(
   return { bucket: config.bucket, key };
 }
 
+/** Descarga el objeto completo a memoria (lo usa el reconocimiento óptico). */
+export async function downloadBuffer(key: string): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const { client, config } = await getStorage();
+  const res = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+  if (!res.Body) throw ApiError.internal('El archivo no se pudo descargar del almacenamiento.');
+  const bytes = await res.Body.transformToByteArray();
+  return { buffer: Buffer.from(bytes), contentType: res.ContentType ?? null };
+}
+
 export async function copyObject(sourceKey: string, targetKey: string): Promise<void> {
   const { client, config } = await getStorage();
   await client.send(

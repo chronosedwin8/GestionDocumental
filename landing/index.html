@@ -1,318 +1,895 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduArchive SGDEA - Sistema de Gestión Documental</title>
-    <meta name="description"
-        content="EduArchive SGDEA: Sistema de Gestión de Documentos Electrónicos de Archivo para instituciones educativas en Colombia.">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EduArchive SGDEA: archivo electrónico para colegios</title>
+  <meta name="description" content="Gestión documental electrónica para instituciones educativas colombianas: foliación automática, TRD, expedientes, radicación y búsqueda por contenido real.">
+  <meta name="keywords" content="SGDEA Colombia, gestión documental colegios, Ley 594 de 2000, Tabla de Retención Documental, foliación automática, expediente electrónico, radicación">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://eduarchive.com.co/">
 
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
-        rel="stylesheet">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="EduArchive SGDEA: archivo electrónico para colegios">
+  <meta property="og:description" content="Gestión documental electrónica para instituciones educativas colombianas: foliación automática, TRD, expedientes, radicación y búsqueda por contenido real.">
+  <meta property="og:image" content="https://eduarchive.com.co/img/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="EduArchive SGDEA: archivo electrónico que cumple la norma colombiana">
+  <meta property="og:url" content="https://eduarchive.com.co/">
+  <meta property="og:locale" content="es_CO">
+  <meta property="og:site_name" content="EduArchive SGDEA">
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="css/styles.css">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EduArchive SGDEA: archivo electrónico para colegios">
+  <meta name="twitter:description" content="Gestión documental electrónica para instituciones educativas colombianas: foliación automática, TRD, expedientes, radicación y búsqueda por contenido real.">
+  <meta name="twitter:image" content="https://eduarchive.com.co/img/og-image.png">
+  <meta name="twitter:image:alt" content="EduArchive SGDEA: archivo electrónico que cumple la norma colombiana">
+
+  <meta name="theme-color" content="#0a0c07">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "EduArchive SGDEA",
+    "alternateName": "Sistema de Gestión de Documentos Electrónicos de Archivo",
+    "url": "https://eduarchive.com.co/",
+    "applicationCategory": "BusinessApplication",
+    "applicationSubCategory": "Gestión documental y archivo electrónico",
+    "operatingSystem": "Navegador web",
+    "inLanguage": "es-CO",
+    "description": "Sistema de Gestión de Documentos Electrónicos de Archivo para instituciones educativas colombianas, con foliación automática, Tablas de Retención Documental, expedientes electrónicos, radicación de correspondencia y búsqueda por el contenido real de los archivos.",
+    "image": "https://eduarchive.com.co/img/og-image.png",
+    "featureList": [
+      "Foliación automática sin colisiones (Acuerdo AGN 039 de 2002)",
+      "Radicación de correspondencia entrante, saliente e interna con consecutivos por año",
+      "Expedientes electrónicos con índice ordenado (Acuerdo AGN 006 de 2014)",
+      "Tablas de Retención Documental con fecha de retención y disposición final automáticas",
+      "Transferencias documentales de gestión a central, histórico y conservación permanente",
+      "Búsqueda por el contenido real del archivo y búsqueda semántica en lenguaje natural",
+      "Cadena de custodia inmutable y auditoría exportable a Excel",
+      "Hojas de vida de empleados y expedientes académicos de estudiantes"
+    ],
+    "publisher": { "@type": "Organization", "name": "EduArchive SGDEA", "url": "https://eduarchive.com.co/" },
+    "offers": [
+      {
+        "@type": "Offer",
+        "name": "Mensual Institucional",
+        "description": "500 GB de almacenamiento, búsqueda con inteligencia artificial básica y soporte de lunes a viernes.",
+        "price": "1700000",
+        "priceCurrency": "COP",
+        "billingIncrement": 1,
+        "unitText": "mes",
+        "availability": "https://schema.org/InStock",
+        "url": "https://eduarchive.com.co/#planes"
+      },
+      {
+        "@type": "Offer",
+        "name": "Anual Premium",
+        "description": "1 TB de almacenamiento, usuarios ilimitados, búsqueda semántica avanzada, soporte prioritario y migración asistida.",
+        "price": "10000000",
+        "priceCurrency": "COP",
+        "billingIncrement": 1,
+        "unitText": "año",
+        "availability": "https://schema.org/InStock",
+        "url": "https://eduarchive.com.co/#planes"
+      },
+      {
+        "@type": "Offer",
+        "name": "Red Educativa",
+        "description": "Precio a la medida para grupos educativos y sedes múltiples: almacenamiento ampliado, varias sedes en una misma instancia, integraciones y acompañamiento archivístico.",
+        "priceCurrency": "COP",
+        "availability": "https://schema.org/InStock",
+        "url": "https://eduarchive.com.co/#contacto"
+      }
+    ]
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "EduArchive SGDEA",
+    "url": "https://eduarchive.com.co/",
+    "logo": "https://eduarchive.com.co/img/og-image.png",
+    "description": "Proveedor del Sistema de Gestión de Documentos Electrónicos de Archivo EduArchive SGDEA para instituciones educativas colombianas.",
+    "email": "ventas@eduarchive.com",
+    "contactPoint": [
+      {
+        "@type": "ContactPoint",
+        "contactType": "ventas",
+        "email": "ventas@eduarchive.com",
+        "availableLanguage": ["es"]
+      }
+    ],
+    "address": [
+      {
+        "@type": "PostalAddress",
+        "streetAddress": "1350 NW 55th St",
+        "addressLocality": "Fort Lauderdale",
+        "addressRegion": "FL",
+        "addressCountry": "US"
+      },
+      {
+        "@type": "PostalAddress",
+        "streetAddress": "770 NW 96th Ave",
+        "addressLocality": "Doral",
+        "addressRegion": "FL",
+        "postalCode": "33172",
+        "addressCountry": "US"
+      }
+    ]
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "EduArchive SGDEA",
+    "url": "https://eduarchive.com.co/",
+    "inLanguage": "es-CO",
+    "publisher": { "@type": "Organization", "name": "EduArchive SGDEA" },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://eduarchive.com.co/wiki/?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "inLanguage": "es-CO",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "¿Dónde se guardan los documentos y quién puede verlos?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Los datos viven en un PostgreSQL instalado en la infraestructura de la institución y los archivos en Amazon S3. El acceso se resuelve en el servidor por dependencia y por documento: el navegador nunca recibe credenciales y las descargas se hacen con enlaces temporales que emite el servidor."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "¿EduArchive cumple con lo que exige el Archivo General de la Nación?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "El sistema implementa los procedimientos que exige la norma: Tablas de Retención Documental con disposición final, foliación con consecutivo sin colisiones, radicación de comunicaciones oficiales, expedientes electrónicos con índice ordenado y transferencias con registro. El cumplimiento final depende además de que la institución tenga su Tabla de Retención Documental aprobada y la mantenga al día."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "¿Qué pasa con el archivo que ya está en papel?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "EduArchive gestiona el archivo electrónico. La digitalización masiva del archivo físico existente es un servicio aparte que se cotiza según el volumen de la institución. El plan anual incluye migración asistida de la información que ya esté en formato digital."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "¿La búsqueda con inteligencia artificial expone los documentos?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "El análisis se ejecuta únicamente en el servidor con Google Gemini y la clave nunca llega al navegador. Para responder, el servidor envía al modelo el texto extraído del documento consultado. Si la institución no configura la clave, la funcionalidad queda deshabilitada y los documentos se guardan igual, marcados como no analizados."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "¿La aprobación electrónica es una firma digital certificada?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. La aprobación electrónica registra el usuario, la fecha y una huella SHA-256 del archivo, y bloquea su edición: es una constancia interna verificable. No equivale a una firma digital con certificado emitido por una entidad de certificación. Si un trámite la exige, se tramita por fuera y el documento firmado se archiva en el sistema."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "¿Qué incluye el precio de los planes?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "El licenciamiento del sistema, el almacenamiento indicado en cada plan, las actualizaciones y el soporte del nivel contratado. Se cotizan aparte la digitalización masiva de archivo físico, la elaboración de la Tabla de Retención Documental si la institución no la tiene y las integraciones con sistemas de terceros."
+        }
+      }
+    ]
+  }
+  </script>
 </head>
 
-<body>
-    <!-- Navbar -->
-    <nav class="navbar glass">
-        <div class="nav-container">
-            <a href="#hero" class="logo">
-                <span class="logo-icon">📁</span>
-                EduArchive<span class="text-acid">SGDEA</span>
-            </a>
-            <ul class="nav-links">
-                <li><a href="#caracteristicas">Características</a></li>
-                <li><a href="#ventajas">Ventajas</a></li>
-                <li><a href="#legal">Marco Legal</a></li>
-                <li><a href="#galeria">Galería</a></li>
-                <li><a href="#planes">Planes</a></li>
-                <li><a href="#faq">FAQ</a></li>
+<body class="page-home">
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="site-header" id="top">
+    <div class="shell site-header__inner">
+      <a class="brand" href="#top">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span class="brand__name">EduArchive<span class="brand__tail">SGDEA</span></span>
+      </a>
+      <nav class="site-nav" id="site-nav" aria-label="Navegación principal">
+        <ul>
+          <li><a href="#beneficios">Beneficios</a></li>
+          <li><a href="#capacidades">Capacidades</a></li>
+          <li><a href="#modulos">Módulos</a></li>
+          <li><a href="#normativa">Normativa</a></li>
+          <li><a href="#galeria">Galería</a></li>
+          <li><a href="#planes">Planes</a></li>
+          <li><a href="wiki/">Ayuda</a></li>
+        </ul>
+      </nav>
+      <a class="btn btn--ghost site-header__cta" href="#contacto">Hablar con ventas</a>
+      <button class="nav-toggle" type="button" aria-label="Abrir el menú de navegación" aria-expanded="false" aria-controls="site-nav">
+        <span aria-hidden="true"></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="contenido">
+
+    <!-- ============================================================ HERO -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="shell hero__grid">
+        <div>
+          <p class="eyebrow">Sistema de Gestión de Documentos Electrónicos de Archivo</p>
+          <h1 id="hero-title">El archivo del colegio deja de ser un riesgo <em>y pasa a ser una prueba.</em></h1>
+          <p class="hero__lead">
+            EduArchive SGDEA aplica la norma archivística colombiana sobre cada documento que entra:
+            lo clasifica, lo folia, lo pone en su expediente y calcula cuándo se transfiere o se elimina.
+            Sin planillas paralelas y sin depender de la memoria de nadie.
+          </p>
+          <div class="hero__actions">
+            <a class="btn btn--acid" href="#planes">Ver planes y precios</a>
+            <a class="btn btn--ghost" href="#beneficios">Qué cambia en la práctica</a>
+          </div>
+          <p class="hero__note">
+            En producción en la Corporación Cultural Colegio Alemán de Barranquilla.
+            Servidor propio sobre PostgreSQL en la infraestructura del colegio, archivos en Amazon S3
+            y análisis con inteligencia artificial ejecutado solo en el servidor.
+          </p>
+        </div>
+
+        <div class="spec">
+          <p class="spec__head"><span>Ficha técnica</span><span>v2</span></p>
+          <dl>
+            <div class="spec__row">
+              <dt>Dependencias</dt>
+              <dd><b>11</b> departamentales</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Roles del sistema</dt>
+              <dd><b>8</b> con matriz editable</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Base de datos</dt>
+              <dd>PostgreSQL propio</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Archivos</dt>
+              <dd>Amazon S3</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Inteligencia artificial</dt>
+              <dd>Gemini, solo servidor</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Credenciales en el navegador</dt>
+              <dd><b>Ninguna</b></dd>
+            </div>
+            <div class="spec__row">
+              <dt>Ciclo vital</dt>
+              <dd>Gestión → Permanente</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================== BENEFICIOS -->
+    <section class="section" id="beneficios" aria-labelledby="beneficios-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Qué cambia</p>
+            <h2 id="beneficios-title">Cinco problemas que dejan de existir</h2>
+          </div>
+          <p class="section-head__text">
+            No se trata de tener los archivos en la nube. Se trata de que el trabajo archivístico que hoy
+            hace una persona a mano, con una planilla y buena voluntad, lo haga el sistema y quede registrado.
+          </p>
+        </header>
+
+        <div class="benefits">
+          <article class="benefit reveal">
+            <p class="benefit__num">01</p>
+            <div>
+              <h3>Cumplimiento sin trabajo manual</h3>
+              <p class="benefit__before">Antes: una hoja de cálculo con los plazos que alguien recuerda revisar.</p>
+            </div>
+            <p>
+              Al clasificar un documento, la Tabla de Retención Documental calcula su fecha de retención
+              y hereda su disposición final. El sistema avisa antes de que el plazo se cumpla y ejecuta
+              conservar, seleccionar o eliminar según lo aprobado, nunca por decisión improvisada.
+            </p>
+          </article>
+
+          <article class="benefit reveal">
+            <p class="benefit__num">02</p>
+            <div>
+              <h3>Búsqueda que encuentra por contenido</h3>
+              <p class="benefit__before">Antes: recordar el nombre del archivo o preguntarle a quien lo guardó.</p>
+            </div>
+            <p>
+              El servidor extrae el texto de los PDF, Word y Excel al subirlos y lo indexa. Una frase suelta
+              de un contrato basta para dar con él. Y si no recuerdas ni la frase, la búsqueda semántica
+              interpreta la pregunta escrita en lenguaje natural.
+            </p>
+          </article>
+
+          <article class="benefit reveal">
+            <p class="benefit__num">03</p>
+            <div>
+              <h3>Trazabilidad que sirve como prueba</h3>
+              <p class="benefit__before">Antes: "creo que ese documento lo tenía la secretaría anterior".</p>
+            </div>
+            <p>
+              Cada documento arrastra su cadena de custodia inmutable: quién lo cargó, quién lo consultó,
+              descargó, prestó o transfirió, y cuándo. La auditoría completa se exporta a Excel y el acta de
+              eliminación en PDF cierra el procedimiento con responsables y huellas.
+            </p>
+          </article>
+
+          <article class="benefit reveal">
+            <p class="benefit__num">04</p>
+            <div>
+              <h3>Cero papel, con procedimiento</h3>
+              <p class="benefit__before">Antes: estantería, carpetas colgantes y folios numerados a lápiz.</p>
+            </div>
+            <p>
+              Radicación con consecutivo por año, foliación automática sin colisiones aunque varias personas
+              trabajen al tiempo, expedientes electrónicos con índice ordenado y transferencias registradas.
+              El expediente electrónico reemplaza al físico porque reproduce su procedimiento, no porque lo escanee.
+            </p>
+          </article>
+
+          <article class="benefit reveal">
+            <p class="benefit__num">05</p>
+            <div>
+              <h3>Tiempo recuperado por el personal</h3>
+              <p class="benefit__before">Antes: media mañana reconstruyendo una hoja de vida incompleta.</p>
+            </div>
+            <p>
+              El semáforo de documentos faltantes muestra de un vistazo qué le falta a la carpeta de un empleado
+              o de un estudiante. La bandeja de pendientes le dice al archivista exactamente qué clasificar hoy.
+              El trabajo mecánico se convierte en revisión.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== CAPACIDADES -->
+    <section class="section" id="capacidades" aria-labelledby="capacidades-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Capacidades</p>
+            <h2 id="capacidades-title">Lo que el sistema hace de verdad</h2>
+          </div>
+          <p class="section-head__text">
+            Cada una de estas funciones está implementada y en uso. No hay módulos "próximamente"
+            en esta lista.
+          </p>
+        </header>
+
+        <div class="grid-3 reveal">
+          <article class="tile">
+            <span class="tile__tag">Acuerdo AGN 039/2002</span>
+            <h3>Foliación automática</h3>
+            <p>Consecutivo por dependencia y año con reserva bajo bloqueo de fila: no hay folios duplicados aunque diez personas suban documentos en el mismo segundo.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Acuerdo AGN 060/2001</span>
+            <h3>Radicación de comunicaciones</h3>
+            <p>Correspondencia entrante, saliente e interna con consecutivo propio por año y plazo de respuesta calculado. Los derechos de petición dejan de vencerse por descuido.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Acuerdo AGN 006/2014</span>
+            <h3>Expedientes electrónicos</h3>
+            <p>Agrupación de la actuación completa con índice ordenado, folios consecutivos y exportación del expediente entero para entregarlo a un ente de control.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Acuerdo AGN 004/2019</span>
+            <h3>Tablas de Retención Documental</h3>
+            <p>Reglas por dependencia y tipo documental que aplican solas la fecha de retención y ejecutan la disposición final: conservar, seleccionar o eliminar.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Ciclo vital</span>
+            <h3>Transferencias documentales</h3>
+            <p>Gestión, central, histórico y conservación permanente. Cada paso queda registrado en la cadena de custodia con su responsable y su fecha.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Búsqueda</span>
+            <h3>Contenido real e IA</h3>
+            <p>Texto extraído de PDF, Word y Excel indexado en español, más búsqueda semántica en lenguaje natural y un asistente que responde preguntas sobre un documento concreto.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Control</span>
+            <h3>Préstamos con vencimiento</h3>
+            <p>Entrega registrada con fecha de devolución, acceso temporal de lectura para quien recibe y alertas antes y después del vencimiento.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Procedimiento</span>
+            <h3>Papelera y acta de eliminación</h3>
+            <p>Ninguna eliminación es inmediata: periodo de gracia con restauración de un clic y acta en PDF con listado, motivo, responsables y huellas al ejecutarla.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Personas</span>
+            <h3>Hojas de vida y expedientes académicos</h3>
+            <p>Un expediente por empleado y uno por estudiante y periodo, con línea de tiempo de seguimiento y semáforo de documentos obligatorios que faltan.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Integridad</span>
+            <h3>Aprobación electrónica</h3>
+            <p>Registra usuario, fecha y huella SHA-256 del archivo y bloquea su edición. Es una constancia interna verificable, no una firma con certificado.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Operación</span>
+            <h3>Notificaciones en tiempo real</h3>
+            <p>Avisos de préstamos, transferencias, retención próxima y solicitudes de eliminación que llegan a la pantalla sin recargar ni revisar el correo.</p>
+          </article>
+
+          <article class="tile">
+            <span class="tile__tag">Gobierno</span>
+            <h3>Auditoría e indicadores</h3>
+            <p>Registro completo exportable a Excel, indicadores de cumplimiento de la TRD por dependencia y control de acceso por dependencia y por documento.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= MÓDULOS -->
+    <section class="section" id="modulos" aria-labelledby="modulos-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Once dependencias</p>
+            <h2 id="modulos-title">Toda la institución en un solo archivo</h2>
+          </div>
+          <p class="section-head__text">
+            El archivo es uno, aunque lo alimenten once áreas distintas. Cada dependencia tiene sus series,
+            su consecutivo de foliación y su propia matriz de permisos.
+          </p>
+        </header>
+
+        <ul class="modules reveal">
+          <li><span>01</span><b>Académico</b></li>
+          <li><span>02</span><b>Talento Humano</b></li>
+          <li><span>03</span><b>Contable y Financiero</b></li>
+          <li><span>04</span><b>Administrativo</b></li>
+          <li><span>05</span><b>Legales</b></li>
+          <li><span>06</span><b>Tecnológico</b></li>
+          <li><span>07</span><b>Comunicaciones</b></li>
+          <li><span>08</span><b>Gestión de Compras</b></li>
+          <li><span>09</span><b>Infraestructura</b></li>
+          <li><span>10</span><b>Seguridad y Salud</b></li>
+          <li><span>11</span><b>Junta Directiva</b></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- =========================================================== ROLES -->
+    <section class="section" id="roles" aria-labelledby="roles-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Ocho roles</p>
+            <h2 id="roles-title">Cada quien ve lo que le corresponde</h2>
+          </div>
+          <p class="section-head__text">
+            La matriz de acceso por rol y dependencia la edita el administrador de la institución.
+            Cada rol tiene su propia guía de uso en la wiki de ayuda, abierta y sin registro.
+          </p>
+        </header>
+
+        <div class="roles reveal">
+          <a class="role-row" href="wiki/rol-administrador/">
+            <span class="role-row__code">ADMIN</span>
+            <span class="role-row__name">Administrador
+              <span class="role-row__desc">Acceso total al sistema y a la configuración</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-rectoria/">
+            <span class="role-row__code">RECTOR</span>
+            <span class="role-row__name">Rectoría
+              <span class="role-row__desc">Acceso total de consulta y gobierno institucional</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-archivista/">
+            <span class="role-row__code">ARCHIVISTA</span>
+            <span class="role-row__name">Archivista
+              <span class="role-row__desc">Gestión documental transversal: clasifica, folia y transfiere</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-administrativo/">
+            <span class="role-row__code">ADMINISTRATIVO</span>
+            <span class="role-row__name">Administrativo
+              <span class="role-row__desc">Secretaría general y administración</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-talento-humano/">
+            <span class="role-row__code">RRHH</span>
+            <span class="role-row__name">Talento Humano
+              <span class="role-row__desc">Historias laborales y seguridad y salud en el trabajo</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-contabilidad/">
+            <span class="role-row__code">CONTADOR</span>
+            <span class="role-row__name">Contabilidad
+              <span class="role-row__desc">Soportes contables y expedientes de compras</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-docente/">
+            <span class="role-row__code">DOCENTE</span>
+            <span class="role-row__name">Docente
+              <span class="role-row__desc">Área académica y expediente del estudiante</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+          <a class="role-row" href="wiki/rol-auditor/">
+            <span class="role-row__code">AUDITOR</span>
+            <span class="role-row__name">Auditor
+              <span class="role-row__desc">Solo lectura de todos los módulos y de la auditoría</span>
+            </span>
+            <span class="role-row__go">Ver guía</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= GALERÍA -->
+    <section class="section" id="galeria" aria-labelledby="galeria-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">La interfaz</p>
+            <h2 id="galeria-title">Cómo se ve por dentro</h2>
+          </div>
+          <p class="section-head__text">
+            Capturas reales de pantallas del sistema en funcionamiento. Las cifras que aparecen corresponden
+            a un entorno de trabajo con pocos documentos cargados: no son resultados de ninguna institución.
+          </p>
+        </header>
+
+        <div class="gallery reveal">
+          <figure class="shot">
+            <img src="img/2.jpg" width="1902" height="856" loading="lazy" decoding="async"
+                 alt="Panel general del sistema con el total de documentos, el almacenamiento utilizado y un semáforo de retención documental con una tarjeta por cada dependencia.">
+            <figcaption><b>Panel general</b>Estado del archivo de un vistazo: documentos, almacenamiento, retención por vencer y acciones pendientes, con el semáforo de retención por dependencia.</figcaption>
+          </figure>
+
+          <figure class="shot">
+            <img src="img/3.jpg" width="1899" height="862" loading="lazy" decoding="async"
+                 alt="Listado de documentos de la dependencia Gestión Académica con columnas de documento, foliación, estado y fecha, y un botón de carga masiva.">
+            <figcaption><b>Listado por dependencia</b>Cada documento con su foliación consecutiva, su estado dentro del ciclo de archivo y sus etiquetas. Desde aquí se hace la carga masiva.</figcaption>
+          </figure>
+
+          <figure class="shot">
+            <img src="img/7.jpg" width="1890" height="853" loading="lazy" decoding="async"
+                 alt="Pantalla de Tabla de Retención Documental agrupada por dependencia, con el tipo documental, los años de retención, la disposición final y las observaciones de cada regla.">
+            <figcaption><b>Tabla de Retención Documental</b>Las reglas de la institución, agrupadas por dependencia, con años de retención y disposición final. Exportable en el formato de inventario.</figcaption>
+          </figure>
+
+          <figure class="shot">
+            <img src="img/1.jpg" width="1900" height="852" loading="lazy" decoding="async"
+                 alt="Pantalla de estadísticas e indicadores con tarjetas de documentos totales, cumplimiento de TRD y préstamos activos, más gráficas por dependencia.">
+            <figcaption><b>Indicadores de gestión</b>Cumplimiento de la Tabla de Retención Documental, documentos por dependencia, préstamos activos y expedientes abiertos frente a cerrados.</figcaption>
+          </figure>
+        </div>
+
+        <p class="gallery-note">
+          Estas capturas corresponden a la versión anterior de la interfaz. Algunas etiquetas cambiaron
+          después: lo que allí aparece como «Firmado» hoy se llama «Aprobación electrónica».
+        </p>
+      </div>
+    </section>
+
+    <!-- ======================================================== NORMATIVA -->
+    <section class="section" id="normativa" aria-labelledby="normativa-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Marco normativo colombiano</p>
+            <h2 id="normativa-title">Las reglas que el sistema ejecuta</h2>
+          </div>
+          <p class="section-head__text">
+            EduArchive implementa los procedimientos que exige la norma. El cumplimiento final también
+            depende de que la institución tenga su Tabla de Retención Documental aprobada y la mantenga al día.
+          </p>
+        </header>
+
+        <ul class="laws reveal">
+          <li>
+            <h3>Ley 594 de 2000</h3>
+            <p>Ley General de Archivos. Ciclo vital del documento, procesos archivísticos y obligación de contar con Tablas de Retención Documental.</p>
+          </li>
+          <li>
+            <h3>Ley 1581 de 2012</h3>
+            <p>Protección de datos personales. Sustenta el control de acceso por dependencia y por documento sobre historias laborales y expedientes de estudiantes.</p>
+          </li>
+          <li>
+            <h3>Acuerdo AGN 002 de 2014</h3>
+            <p>Criterios para la creación, conformación, organización, control y consulta de los expedientes de archivo.</p>
+          </li>
+          <li>
+            <h3>Acuerdo AGN 004 de 2019</h3>
+            <p>Elaboración, aprobación y aplicación de las Tablas de Retención Documental, con sus plazos y disposiciones finales.</p>
+          </li>
+          <li>
+            <h3>Acuerdo AGN 006 de 2014</h3>
+            <p>Gestión de documentos electrónicos de archivo y expedientes electrónicos con índice ordenado.</p>
+          </li>
+          <li>
+            <h3>Acuerdo AGN 060 de 2001</h3>
+            <p>Comunicaciones oficiales: radicación con consecutivo, control de recepción y despacho y tiempos de respuesta.</p>
+          </li>
+          <li>
+            <h3>Acuerdo AGN 039 de 2002</h3>
+            <p>Foliación de los expedientes: numeración consecutiva, sin repeticiones ni saltos.</p>
+          </li>
+          <li>
+            <h3>Decreto 1072 de 2015 y Resolución 1570 de 2005</h3>
+            <p>Retención de los documentos del sistema de gestión de seguridad y salud en el trabajo y de las historias clínicas ocupacionales.</p>
+          </li>
+          <li>
+            <h3>Estatuto Tributario, artículo 632</h3>
+            <p>Conservación de las informaciones y pruebas que soportan la contabilidad durante diez años.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ========================================================== PLANES -->
+    <section class="section" id="planes" aria-labelledby="planes-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Planes</p>
+            <h2 id="planes-title">Tres formas de contratarlo</h2>
+          </div>
+          <p class="section-head__text">
+            Todos los planes incluyen las once dependencias, los ocho roles, el cumplimiento normativo
+            completo y la wiki de ayuda. Lo que cambia es el almacenamiento, los usuarios y el acompañamiento.
+          </p>
+        </header>
+
+        <div class="plans reveal">
+          <!-- Plan 1 -->
+          <article class="plan" aria-labelledby="plan-mensual">
+            <h3 class="plan__name" id="plan-mensual">Mensual Institucional</h3>
+            <p class="plan__price"><sup>$</sup>1.700.000</p>
+            <p class="plan__period">COP · por mes</p>
+            <p class="plan__desc">Para una sede que quiere empezar a ordenar su archivo sin comprometerse a un año.</p>
+            <ul class="plan__features">
+              <li>500 GB de almacenamiento</li>
+              <li>Hasta 25 usuarios con acceso simultáneo</li>
+              <li>Las 11 dependencias y los 8 roles</li>
+              <li>Búsqueda con inteligencia artificial básica</li>
+              <li>Foliación, radicación, TRD y expedientes</li>
+              <li>Soporte de lunes a viernes</li>
             </ul>
-            <button class="menu-toggle" id="mobile-menu" aria-label="Abrir menú">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-            </button>
+            <a class="btn btn--ghost btn--block" href="#contacto">Contactar ventas</a>
+          </article>
+
+          <!-- Plan 2 (recomendado) -->
+          <article class="plan plan--featured" aria-labelledby="plan-anual">
+            <p class="plan__badge">Recomendado</p>
+            <h3 class="plan__name" id="plan-anual">Anual Premium</h3>
+            <p class="plan__price"><sup>$</sup>10.000.000</p>
+            <p class="plan__period">COP · por año</p>
+            <p class="plan__desc">El plan pensado para operar el archivo completo de una institución durante todo el año lectivo.</p>
+            <ul class="plan__features">
+              <li>1 TB de almacenamiento</li>
+              <li>Usuarios ilimitados</li>
+              <li>Búsqueda semántica avanzada y asistente por documento</li>
+              <li>Migración asistida de la información ya digitalizada</li>
+              <li>Soporte prioritario</li>
+              <li>Todo lo del plan mensual</li>
+            </ul>
+            <a class="btn btn--acid btn--block" href="#contacto">Solicitar el plan anual</a>
+          </article>
+
+          <!-- Plan 3 -->
+          <article class="plan" aria-labelledby="plan-red">
+            <h3 class="plan__name" id="plan-red">Red Educativa</h3>
+            <p class="plan__price">Precio a la medida</p>
+            <p class="plan__period">COP · según sedes y volumen</p>
+            <p class="plan__desc">Para grupos educativos y colegios con varias sedes que necesitan un archivo común y gobierno central.</p>
+            <ul class="plan__features">
+              <li>Almacenamiento ampliado según el volumen real</li>
+              <li>Varias sedes con su propia numeración y permisos</li>
+              <li>Consolidado institucional de indicadores</li>
+              <li>Integraciones con los sistemas que ya usa el grupo</li>
+              <li>Acompañamiento archivístico para elaborar o actualizar la TRD</li>
+              <li>Todo lo del plan anual</li>
+            </ul>
+            <a class="btn btn--ghost btn--block" href="#contacto">Pedir una cotización</a>
+          </article>
         </div>
-    </nav>
 
-    <main>
-        <!-- Hero Section -->
-        <section id="hero" class="hero bg-grid">
-            <div class="hero-content">
-                <div class="badge animate-fade-in">🚀 Versión 1.0 Disponible</div>
-                <h1 class="animate-slide-up text-glow">Transforma la Gestión Documental Educativa</h1>
-                <p class="hero-subtitle animate-slide-up delay-1">
-                    El primer Sistema de Gestión de Documentos Electrónicos de Archivo diseñado exclusivamente para
-                    colegios en Colombia. Cumple la norma, optimiza procesos y asegura tu información con AWS S3 y
-                    tecnología IA.
-                </p>
-                <div class="hero-actions animate-slide-up delay-2">
-                    <a href="#planes" class="btn btn-acid">Ver Planes y Precios</a>
-                    <a href="#caracteristicas" class="btn btn-outline">Descubrir Más</a>
-                </div>
-            </div>
-            <div class="hero-glow"></div>
-        </section>
+        <p class="plans-note">
+          Precios en pesos colombianos, antes de impuestos. Se cotizan aparte la digitalización masiva del
+          archivo físico existente, la elaboración de la Tabla de Retención Documental cuando la institución
+          no la tiene aprobada y las integraciones con sistemas de terceros.
+        </p>
+      </div>
+    </section>
 
-        <!-- Características Section -->
-        <section id="caracteristicas" class="section">
-            <div class="container">
-                <h2 class="section-title">Características <span class="text-acid">Principales</span></h2>
-                <div class="grid features-grid">
-                    <div class="card glass">
-                        <div class="card-icon text-acid">☁️</div>
-                        <h3>Almacenamiento en AWS S3</h3>
-                        <p>Infraestructura en la nube inmutable con Amazon S3. Tus documentos seguros con S3 Object Lock
-                            para evitar modificaciones no autorizadas.</p>
-                    </div>
-                    <div class="card glass">
-                        <div class="card-icon text-acid">🤖</div>
-                        <h3>Búsqueda Inteligente IA</h3>
-                        <p>Encuentra cualquier documento usando lenguaje natural gracias a nuestra integración avanzada
-                            con Gemini AI. Extracción automática de metadatos.</p>
-                    </div>
-                    <div class="card glass">
-                        <div class="card-icon text-acid">🎓</div>
-                        <h3>Gestión Modular</h3>
-                        <p>Módulos especializados para Expediente Académico, Talento Humano, Financiero y
-                            Administrativo. Todo en un solo lugar.</p>
-                    </div>
-                    <div class="card glass">
-                        <div class="card-icon text-acid">🔐</div>
-                        <h3>Seguridad Avanzada</h3>
-                        <p>Control de acceso basado en roles (RBAC) impulsado por Supabase, auditoría completa tipo
-                            CloudTrail y cifrado de extremo a extremo.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
+    <!-- ============================================================= FAQ -->
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="shell">
+        <header class="section-head reveal">
+          <div>
+            <p class="section-head__eyebrow">Preguntas frecuentes</p>
+            <h2 id="faq-title">Lo que preguntan antes de decidir</h2>
+          </div>
+          <p class="section-head__text">
+            Respuestas directas, incluso donde la respuesta honesta es "no". Si tu pregunta no está aquí,
+            escríbenos: preferimos decirlo antes de la firma.
+          </p>
+        </header>
 
-        <!-- Ventajas Section -->
-        <section id="ventajas" class="section bg-elevated">
-            <div class="container">
-                <h2 class="section-title">¿Por qué elegir <span class="text-acid">EduArchive</span>?</h2>
-                <div class="grid advantages-grid">
-                    <div class="advantage-item">
-                        <div class="adv-number text-acid">01</div>
-                        <div class="adv-content">
-                            <h3>Cero Papel</h3>
-                            <p>Reduce costos operativos y de almacenamiento físico. Digitaliza tu archivo histórico y
-                                gestiona el nuevo de forma 100% electrónica.</p>
-                        </div>
-                    </div>
-                    <div class="advantage-item">
-                        <div class="adv-number text-acid">02</div>
-                        <div class="adv-content">
-                            <h3>Productividad</h3>
-                            <p>Automatiza flujos de trabajo, aprobaciones y centraliza la búsqueda de expedientes de
-                                estudiantes y docentes en segundos.</p>
-                        </div>
-                    </div>
-                    <div class="advantage-item">
-                        <div class="adv-number text-acid">03</div>
-                        <div class="adv-content">
-                            <h3>Auditoría y Trazabilidad</h3>
-                            <p>Registro inalterable de cada acción: quién vio, editó o descargó un documento. Cumple con
-                                las exigencias de las secretarías de educación.</p>
-                        </div>
-                    </div>
-                </div>
+        <div class="faq reveal">
+          <details>
+            <summary>¿Dónde se guardan los documentos y quién puede verlos?</summary>
+            <div class="faq__answer">
+              <p>Los datos viven en un PostgreSQL instalado en la infraestructura de la institución y los archivos en Amazon S3. El acceso se resuelve en el servidor por dependencia y por documento: el navegador nunca recibe credenciales y las descargas se hacen con enlaces temporales que emite el servidor.</p>
             </div>
-        </section>
+          </details>
 
-        <!-- Galería Section -->
-        <section id="galeria" class="section bg-grid">
-            <div class="container">
-                <h2 class="section-title">Galería de <span class="text-acid">Imágenes</span></h2>
-                <div class="gallery-wrapper glass">
-                    <div class="gallery-container">
-                        <div class="gallery-track" id="gallery-track">
-                            <div class="gallery-slide"><img src="img/1.jpg" alt="Dashboard Panel General"></div>
-                            <div class="gallery-slide"><img src="img/2.jpg" alt="Gestión Académica"></div>
-                            <div class="gallery-slide"><img src="img/3.jpg" alt="Carga Masiva de Documentos"></div>
-                            <div class="gallery-slide"><img src="img/4.jpg" alt="Análisis de IA Documental"></div>
-                            <div class="gallery-slide"><img src="img/5.jpg" alt="Estadísticas y KPI"></div>
-                            <div class="gallery-slide"><img src="img/6.jpg" alt="Captura de Pantalla 6"></div>
-                            <div class="gallery-slide"><img src="img/7.jpg" alt="Captura de Pantalla 7"></div>
-                            <div class="gallery-slide"><img src="img/8.jpg" alt="Captura de Pantalla 8"></div>
-                        </div>
-                    </div>
-                    <button class="gallery-btn prev" id="prev-btn" aria-label="Anterior">&#10094;</button>
-                    <button class="gallery-btn next" id="next-btn" aria-label="Siguiente">&#10095;</button>
-                    <div class="gallery-indicators" id="gallery-indicators"></div>
-                </div>
+          <details>
+            <summary>¿EduArchive cumple con lo que exige el Archivo General de la Nación?</summary>
+            <div class="faq__answer">
+              <p>El sistema implementa los procedimientos que exige la norma: Tablas de Retención Documental con disposición final, foliación con consecutivo sin colisiones, radicación de comunicaciones oficiales, expedientes electrónicos con índice ordenado y transferencias con registro. El cumplimiento final depende además de que la institución tenga su Tabla de Retención Documental aprobada y la mantenga al día.</p>
             </div>
-        </section>
+          </details>
 
-        <!-- Marco Legal Section -->
-        <section id="legal" class="section">
-            <div class="container">
-                <div class="legal-wrapper glass-light">
-                    <h2 class="section-title">Cumplimiento <span class="text-acid">Normativo Colombiano</span></h2>
-                    <p class="legal-intro">EduArchive SGDEA está diseñado desde sus cimientos para cumplir con el marco
-                        jurídico nacional respecto a la gestión documental e información.</p>
+          <details>
+            <summary>¿Qué pasa con el archivo que ya está en papel?</summary>
+            <div class="faq__answer">
+              <p>EduArchive gestiona el archivo electrónico. La digitalización masiva del archivo físico existente es un servicio aparte que se cotiza según el volumen de la institución. El plan anual incluye migración asistida de la información que ya esté en formato digital.</p>
+            </div>
+          </details>
 
-                    <div class="legal-grid">
-                        <div class="legal-card">
-                            <h4>Ley 594 de 2000</h4>
-                            <p>Ley General de Archivos. Cumplimiento de los procesos archivísticos, Tablas de Retención
-                                Documental (TRD) y ciclo de vida del documento.</p>
-                        </div>
-                        <div class="legal-card">
-                            <h4>Ley 1581 de 2012</h4>
-                            <p>Protección de Datos Personales (Habeas Data). Aseguramos la privacidad de la información
-                                de estudiantes, padres y empleados.</p>
-                        </div>
-                        <div class="legal-card">
-                            <h4>Acuerdo 002 de 2014</h4>
-                            <p>AGN - Criterios básicos para la creación, conformación, organización, control y consulta
-                                de los expedientes de archivo.</p>
-                        </div>
-                    </div>
-                </div>
+          <details>
+            <summary>¿La búsqueda con inteligencia artificial expone los documentos?</summary>
+            <div class="faq__answer">
+              <p>El análisis se ejecuta únicamente en el servidor con Google Gemini y la clave nunca llega al navegador. Para responder, el servidor envía al modelo el texto extraído del documento consultado. Si la institución no configura la clave, la funcionalidad queda deshabilitada y los documentos se guardan igual, marcados como no analizados.</p>
             </div>
-        </section>
+          </details>
 
-        <!-- Planes Section -->
-        <section id="planes" class="section bg-grid">
-            <div class="container">
-                <h2 class="section-title">Planes y <span class="text-acid">Precios</span></h2>
-                <div class="pricing-grid">
-                    <!-- Plan Mensual -->
-                    <div class="pricing-card glass">
-                        <h3>Mensual Institucional</h3>
-                        <div class="price">
-                            <span class="currency">$</span>1.700.000 <span class="period">COP / mes</span>
-                        </div>
-                        <p class="pricing-desc">Ideal para probar la transformación digital en tu institución.</p>
-                        <ul class="feature-list">
-                            <li>Almacenamiento S3 (500GB)</li>
-                            <li>1 Usuario</li>
-                            <li>Búsqueda con IA Básica</li>
-                            <li>Soporte L-V</li>
-                            <li>Cumplimiento Normativo</li>
-                        </ul>
-                        <button class="btn btn-outline w-full mt-auto">Contactar Ventas</button>
-                    </div>
+          <details>
+            <summary>¿La aprobación electrónica es una firma digital certificada?</summary>
+            <div class="faq__answer">
+              <p>No. La aprobación electrónica registra el usuario, la fecha y una huella SHA-256 del archivo, y bloquea su edición: es una constancia interna verificable. No equivale a una firma digital con certificado emitido por una entidad de certificación. Si un trámite la exige, se tramita por fuera y el documento firmado se archiva en el sistema.</p>
+            </div>
+          </details>
 
-                    <!-- Plan Anual (Destacado) -->
-                    <div class="pricing-card glass active-plan">
-                        <div class="popular-badge">Más Rentable</div>
-                        <h3>Anual Premium</h3>
-                        <div class="price text-acid">
-                            <span class="currency">$</span>10.000.000 <span class="period">COP / año</span>
-                        </div>
-                        <p class="pricing-desc">La solución completa para la gestión total a largo plazo.</p>
-                        <ul class="feature-list">
-                            <li><strong>Ahorro de más de $3.000.000 COP</strong></li>
-                            <li>Almacenamiento S3 (1TB)</li>
-                            <li>Usuarios Ilimitados</li>
-                            <li>Búsqueda Semántica IA Avanzada</li>
-                            <li>Soporte Prioritario 24/7</li>
-                            <li>Migración de Datos Asistida</li>
-                        </ul>
-                        <button class="btn btn-acid w-full mt-auto">Adquirir Plan Anual</button>
-                    </div>
-                </div>
+          <details>
+            <summary>¿Qué incluye el precio de los planes?</summary>
+            <div class="faq__answer">
+              <p>El licenciamiento del sistema, el almacenamiento indicado en cada plan, las actualizaciones y el soporte del nivel contratado. Se cotizan aparte la digitalización masiva de archivo físico, la elaboración de la Tabla de Retención Documental si la institución no la tiene y las integraciones con sistemas de terceros.</p>
             </div>
-        </section>
-
-        <!-- FAQ Section -->
-        <section id="faq" class="section">
-            <div class="container faq-container">
-                <h2 class="section-title">Preguntas <span class="text-acid">Frecuentes</span></h2>
-                <div class="accordion">
-                    <div class="accordion-item glass">
-                        <button class="accordion-header">
-                            ¿Dónde se almacenan los documentos de mi colegio?
-                            <span class="icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>Todos los documentos se almacenan de manera segura en Amazon Web Services (AWS) S3.
-                                Utilizamos políticas de Object Lock para garantizar la inmutabilidad de los archivos,
-                                asegurando que no puedan ser alterados o eliminados accidentalmente, cumpliendo con los
-                                estándares de archivo histórico.</p>
-                        </div>
-                    </div>
-                    <div class="accordion-item glass">
-                        <button class="accordion-header">
-                            ¿El sistema cumple con el Archivo General de la Nación (AGN)?
-                            <span class="icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>Sí, EduArchive SGDEA está parametrizado para soportar las Tablas de Retención Documental
-                                (TRD) y cumple con las directrices del Acuerdo 002 de 2014 del AGN y la Ley 594 de 2000
-                                aplicables a instituciones educativas en Colombia.</p>
-                        </div>
-                    </div>
-                    <div class="accordion-item glass">
-                        <button class="accordion-header">
-                            ¿Cómo funciona la búsqueda con IA?
-                            <span class="icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>Integramos tecnología de Gemini AI. Cuando subes un documento, la IA extrae
-                                automáticamente metadatos clave. Luego, puedes buscar expedientes escribiendo en
-                                lenguaje natural, por ejemplo: "Mostrar contrato de Juan Pérez de 2023", y el sistema
-                                encontrará exactamente lo que necesitas.</p>
-                        </div>
-                    </div>
-                    <div class="accordion-item glass">
-                        <button class="accordion-header">
-                            ¿Existen costos ocultos de implementación?
-                            <span class="icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>No. Nuestros planes Mensual y Anual Premium cubren el licenciamiento, almacenamiento
-                                indicado, y soporte. Los servicios adicionales como digitalización masiva de archivo
-                                físico se cotizan por separado según el volumen del colegio.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer class="footer">
-        <div class="container footer-content">
-            <div class="footer-brand">
-                <a href="#hero" class="logo">
-                    <span class="logo-icon">📁</span>
-                    EduArchive<span class="text-acid">SGDEA</span>
-                </a>
-                <p>El sistema definitivo para la gestión documental de instituciones educativas en Colombia.</p>
-            </div>
-            <div class="footer-links">
-                <h4>Enlaces</h4>
-                <ul>
-                    <li><a href="#caracteristicas">Características</a></li>
-                    <li><a href="#ventajas">Ventajas</a></li>
-                    <li><a href="#legal">Legal</a></li>
-                    <li><a href="#galeria">Galería</a></li>
-                    <li><a href="#planes">Planes</a></li>
-                </ul>
-            </div>
-            <div class="footer-contact">
-                <h4>Contacto</h4>
-                <p>ventas@eduarchive.com</p>
-                <p>1350 NW 55th St, Fort Lauderdale</p>
-                <p>770 NW 96th Ave, Doral, FL 33172.</p>
-            </div>
+          </details>
         </div>
-        <div class="footer-bottom">
-            <p>&copy; 2026 EduArchive SGDEA. Todos los derechos reservados.</p>
-        </div>
-    </footer>
+      </div>
+    </section>
 
-    <script src="js/main.js"></script>
+    <!-- ======================================================== CONTACTO -->
+    <section class="cta" id="contacto" aria-labelledby="contacto-title">
+      <div class="shell cta__grid">
+        <div>
+          <p class="eyebrow">Siguiente paso</p>
+          <h2 id="contacto-title">Hablemos del archivo de tu institución</h2>
+          <p>
+            Escríbenos con el número aproximado de documentos, cuántas dependencias van a usar el sistema
+            y si la institución ya tiene su Tabla de Retención Documental aprobada. Con eso podemos decirte
+            qué plan corresponde y qué se necesita para la puesta en marcha.
+          </p>
+          <p>
+            Antes de escribir, puedes recorrer la
+            <a class="link-arrow" href="wiki/">wiki de ayuda por rol</a>
+          </p>
+        </div>
+
+        <div class="contact-card">
+          <dl>
+            <div>
+              <dt>Correo de ventas</dt>
+              <dd><a href="mailto:ventas@eduarchive.com">ventas@eduarchive.com</a></dd>
+            </div>
+            <div>
+              <dt>Oficina</dt>
+              <dd>1350 NW 55th St, Fort Lauderdale</dd>
+            </div>
+            <div>
+              <dt>Oficina</dt>
+              <dd>770 NW 96th Ave, Doral, FL 33172</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell site-footer__grid">
+      <div>
+        <a class="brand" href="#top">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">EduArchive<span class="brand__tail">SGDEA</span></span>
+        </a>
+        <p class="site-footer__note">Sistema de Gestión de Documentos Electrónicos de Archivo para instituciones educativas colombianas. En producción en la Corporación Cultural Colegio Alemán de Barranquilla.</p>
+      </div>
+      <div>
+        <h2 class="site-footer__title">Producto</h2>
+        <ul class="site-footer__list">
+          <li><a href="#beneficios">Beneficios para la institución</a></li>
+          <li><a href="#capacidades">Capacidades del sistema</a></li>
+          <li><a href="#modulos">Módulos departamentales</a></li>
+          <li><a href="#planes">Planes y precios</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="site-footer__title">Ayuda</h2>
+        <ul class="site-footer__list">
+          <li><a href="wiki/">Wiki de ayuda por rol</a></li>
+          <li><a href="wiki/guia-subir-y-clasificar/">Subir y clasificar documentos</a></li>
+          <li><a href="wiki/guia-trd-y-transferencias/">TRD y transferencias</a></li>
+          <li><a href="wiki/glosario-archivistico/">Glosario archivístico</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="site-footer__title">Contacto</h2>
+        <ul class="site-footer__list">
+          <li><a href="mailto:ventas@eduarchive.com">ventas@eduarchive.com</a></li>
+          <li>1350 NW 55th St, Fort Lauderdale</li>
+          <li>770 NW 96th Ave, Doral, FL 33172</li>
+        </ul>
+      </div>
+    </div>
+    <div class="shell site-footer__bottom">
+      <p>&copy; 2026 EduArchive SGDEA. Todos los derechos reservados.</p>
+      <p>Ley 594 de 2000 · Ley 1581 de 2012 · Acuerdos del Archivo General de la Nación</p>
+    </div>
+  </footer>
+
+  <script src="js/main.js" defer></script>
 </body>
-
 </html>

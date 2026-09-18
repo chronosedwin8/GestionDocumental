@@ -14,6 +14,7 @@ import * as documentsApi from '@/api/documents';
 import * as trdApi from '@/api/trd';
 import { ApiError, sha256File } from '@/api/client';
 import { useCatalogs } from '@/contexts/CatalogContext';
+import { useAiConfidenceThreshold } from '@/hooks/useAiHealth';
 import { useQuery } from '@/hooks/useQuery';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -25,6 +26,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { formatBytes } from '@/lib/format';
+import { AiClassificationPanel } from './AiClassificationPanel';
 import type { ApiDocument } from '@/types/api';
 import type { UploadItem } from '@/types/ui';
 
@@ -60,6 +62,7 @@ export function UploadWizard({
   onUploaded,
 }: UploadWizardProps): React.JSX.Element {
   const { settings, moduleLabel } = useCatalogs();
+  const aiThreshold = useAiConfidenceThreshold();
   const [step, setStep] = useState<Step>('files');
   const [items, setItems] = useState<UploadItem[]>([]);
   const [rejected, setRejected] = useState<{ name: string; reason: string }[]>([]);
@@ -90,6 +93,20 @@ export function UploadWizard({
 
   const categoryOptions = useMemo(
     () => (categories.data ?? []).map((cat) => ({ value: cat.name, label: cat.name })),
+    [categories.data],
+  );
+
+  /** Valores reales del catálogo: la IA no puede proponer nada fuera de ellos. */
+  const typeValues = useMemo(
+    () => (rules.data ?? []).map((rule) => rule.document_type),
+    [rules.data],
+  );
+  const serieValues = useMemo(
+    () => (categories.data ?? []).map((cat) => cat.name),
+    [categories.data],
+  );
+  const subserieValues = useMemo(
+    () => (categories.data ?? []).flatMap((cat) => (cat.subcategories ?? []).map((sub) => sub.name)),
     [categories.data],
   );
 
@@ -171,6 +188,30 @@ export function UploadWizard({
 
   const updateItem = (id: string, patch: Partial<UploadItem>): void => {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+
+  /**
+   * Aplica una sugerencia de la IA que una persona acaba de confirmar. Al
+   * aceptar una subserie se completa también su serie padre, porque el
+   * formulario no admite subserie sin serie.
+   */
+  const acceptSuggestion = (
+    id: string,
+    field: 'type' | 'category' | 'subcategory',
+    value: string,
+  ): void => {
+    if (field === 'type') {
+      updateItem(id, { type: value });
+      return;
+    }
+    if (field === 'category') {
+      updateItem(id, { category: value, subcategory: '' });
+      return;
+    }
+    const parent = (categories.data ?? []).find((cat) =>
+      (cat.subcategories ?? []).some((sub) => sub.name === value),
+    );
+    updateItem(id, { subcategory: value, ...(parent ? { category: parent.name } : {}) });
   };
 
   /** Aplica tipo/categoría a todos los archivos de golpe. */
@@ -491,6 +532,24 @@ export function UploadWizard({
                     />
                   </FormField>
                 </div>
+
+                {settings?.ai_enabled !== false && (
+                  <AiClassificationPanel
+                    moduleCode={moduleCode}
+                    file={item.file}
+                    value={{
+                      type: item.type,
+                      category: item.category,
+                      subcategory: item.subcategory,
+                    }}
+                    typeValues={typeValues}
+                    serieValues={serieValues}
+                    subserieValues={subserieValues}
+                    threshold={aiThreshold}
+                    disabled={uploading}
+                    onAccept={(field, value) => acceptSuggestion(item.id, field, value)}
+                  />
+                )}
               </li>
             ))}
           </ul>

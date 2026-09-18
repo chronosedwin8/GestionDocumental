@@ -315,8 +315,35 @@ export async function sha256File(file: Blob): Promise<string> {
 
 export interface SseHandlers {
   onToken: (text: string) => void;
+  /** Evento `sources` del contrato de IA: citas verificables de la respuesta. */
+  onSources?: (sources: { quote: string; offset: number }[]) => void;
   onDone?: () => void;
   onError?: (error: ApiError) => void;
+}
+
+/** Normaliza el payload del evento `sources` (array suelto o `{ sources }`). */
+function parseSources(raw: string): { quote: string; offset: number }[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const list = Array.isArray(parsed)
+    ? parsed
+    : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { sources?: unknown }).sources)
+      ? ((parsed as { sources: unknown[] }).sources)
+      : [];
+
+  const sources: { quote: string; offset: number }[] = [];
+  for (const entry of list) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const quote = (entry as { quote?: unknown }).quote;
+    const offset = (entry as { offset?: unknown }).offset;
+    if (typeof quote !== 'string' || quote.trim() === '') continue;
+    sources.push({ quote, offset: typeof offset === 'number' ? offset : -1 });
+  }
+  return sources;
 }
 
 /**
@@ -362,6 +389,10 @@ export async function streamSse(
     if (dataLines.length === 0) return false;
     const raw = dataLines.join('\n');
 
+    if (event === 'sources') {
+      handlers.onSources?.(parseSources(raw));
+      return false;
+    }
     if (event === 'done') {
       handlers.onDone?.();
       return true;

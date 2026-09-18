@@ -1,6 +1,7 @@
 /** Tipos propios de la interfaz (no vienen del contrato de API). */
 
 import type { ReactNode } from 'react';
+import type { AiChatSource } from './api';
 
 export type Theme = 'dark' | 'light';
 
@@ -57,6 +58,8 @@ export interface ChatMessage {
   timestamp: number;
   pending?: boolean;
   error?: boolean;
+  /** Citas del evento SSE `sources` (contrato de IA). */
+  sources?: AiChatSource[];
 }
 
 export type UploadItemStatus = 'pending' | 'hashing' | 'uploading' | 'done' | 'error';

@@ -17,7 +17,9 @@ export type CustodyEventType =
   | 'RETURNED'
   | 'DELETED'
   | 'RESTORED'
-  | 'PURGED';
+  | 'PURGED'
+  /** Reconocimiento óptico con el modelo de visión (POST /ai/ocr). */
+  | 'OCR';
 
 export type CustodyRow = {
   id: string;

@@ -12,7 +12,7 @@ import {
 } from './access.js';
 import { getDocumentStatus, requireModule } from './catalogs.js';
 import { logCustody } from './custody.js';
-import { extractText } from './extraction.js';
+import { extractText, supportsOcr } from './extraction.js';
 import { fullAccessUserIds, notifyMany } from './notifications.js';
 import {
   buildDocumentKey,
@@ -23,8 +23,14 @@ import {
   presignDownload,
   uploadBuffer,
 } from './storage.js';
-import { getConfigOr, isAiConfigured } from './system.js';
-import { analyzeDocument } from './ai.js';
+import { getConfigOr, isAiEnabled } from './system.js';
+import {
+  aiQueueSize,
+  enqueueAiAnalysis,
+  enqueueOcr,
+  runAnalyze,
+  type AnalyzeOutcome,
+} from './aiDocuments.js';
 
 export const STATUS_GESTION = 'ARCHIVO_GESTION';
 export const STATUS_CENTRAL = 'ARCHIVO_CENTRAL';
@@ -40,6 +46,7 @@ const DOC_COLUMNS = `
   d.id, d.title, d.type, d.module_code, d.folio_index, d.s3_key, d.s3_bucket,
   d.file_name, d.file_type, d.file_size, d.sha256, d.page_count,
   d.status_code, d.previous_status_code, d.author_id, d.summary, d.ai_status,
+  d.ai_error, d.ai_analyzed_at,
   d.category, d.subcategory, d.person_id, d.academic_period_id, d.retention_end_date,
   d.approved_by, d.approved_at, d.approval_sha256,
   d.deleted_at, d.deleted_by, d.delete_reason, d.permanent_delete_at,
@@ -87,6 +94,8 @@ export type DocumentDto = {
   author: { id: string; full_name: string; email: string } | null;
   summary: string | null;
   ai_status: string;
+  ai_error: string | null;
+  ai_analyzed_at: string | null;
   category: string | null;
   subcategory: string | null;
   person_id: string | null;
@@ -136,6 +145,8 @@ export function mapDocument(row: DocumentRow): DocumentDto {
       : null,
     summary: (row.summary as string | null) ?? null,
     ai_status: (row.ai_status as string) ?? 'PENDING',
+    ai_error: (row.ai_error as string | null) ?? null,
+    ai_analyzed_at: toIsoDate(row.ai_analyzed_at),
     category: (row.category as string | null) ?? null,
     subcategory: (row.subcategory as string | null) ?? null,
     person_id: (row.person_id as string | null) ?? null,
@@ -347,7 +358,11 @@ export async function createDocument(
 
   const extracted = await extractText(file.buffer, file.mimetype, file.originalname);
   const autoFolio = await getConfigOr<boolean>('auto_folio', true);
-  const aiEnabled = isAiConfigured();
+  const aiEnabled = await isAiEnabled();
+  const hasText = (extracted.text ?? '').trim().length >= 40;
+  const ocrAuto = aiEnabled && !hasText && (await getConfigOr<boolean>('ai_ocr_auto', true));
+  const ocrCandidate =
+    ocrAuto && supportsOcr(file.mimetype, file.originalname, await getConfigOr<string[]>('ai_ocr_mime_types', []));
 
   try {
     const id = await withTransaction(async (client) => {
@@ -371,7 +386,7 @@ export async function createDocument(
           extracted.pageCount,
           user.id,
           extracted.text,
-          aiEnabled ? 'PENDING' : 'SKIPPED',
+          aiEnabled && (hasText || ocrCandidate) ? 'PENDING' : 'SKIPPED',
           input.category ?? null,
           input.subcategory ?? null,
           input.person_id ?? null,
@@ -415,7 +430,10 @@ export async function createDocument(
       { file_name: file.originalname, file_size: file.size, sha256 },
     );
 
-    if (aiEnabled) enqueueAiAnalysis(id);
+    // Sin texto extraíble y formato con visión: primero reconocimiento óptico,
+    // el análisis se encola solo si el OCR encuentra texto.
+    if (ocrCandidate) enqueueOcr(id);
+    else if (aiEnabled && hasText) enqueueAiAnalysis(id);
 
     const created = await getDocumentForUser(user, id);
     notifyDocumentUpdated(created.id, created.module_code);
@@ -683,15 +701,19 @@ export async function downloadDocument(
 export async function getDocumentText(
   user: AuthUser,
   id: string,
-): Promise<{ text: string; truncated: boolean }> {
+  options: { full?: boolean } = {},
+): Promise<{ text: string; truncated: boolean; total_chars: number }> {
   await getDocumentForUser(user, id);
   const row = await one<{ extracted_text: string | null }>(
     'SELECT extracted_text FROM documents WHERE id = $1',
     [id],
   );
-  const limit = 100_000;
   const text = row?.extracted_text ?? '';
-  return { text: text.slice(0, limit), truncated: text.length > limit };
+  // `full` lo usa el chat: el contexto se elige por relevancia sobre el texto
+  // COMPLETO, no cortando por el principio.
+  if (options.full) return { text, truncated: false, total_chars: text.length };
+  const limit = await getConfigOr<number>('document_text_preview_chars', 100_000);
+  return { text: text.slice(0, limit), truncated: text.length > limit, total_chars: text.length };
 }
 
 // ── Etiquetas, metadatos, notas ─────────────────────────────
@@ -819,7 +841,13 @@ export async function addVersion(
   await uploadBuffer(newKey, file.buffer, file.mimetype, { sha256 });
 
   const extracted = await extractText(file.buffer, file.mimetype, file.originalname);
-  const aiEnabled = isAiConfigured();
+  const aiEnabled = await isAiEnabled();
+  const versionHasText = (extracted.text ?? '').trim().length >= 40;
+  const versionOcrCandidate =
+    aiEnabled &&
+    !versionHasText &&
+    (await getConfigOr<boolean>('ai_ocr_auto', true)) &&
+    supportsOcr(file.mimetype, file.originalname, await getConfigOr<string[]>('ai_ocr_mime_types', []));
 
   const versionId = await withTransaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
@@ -841,7 +869,8 @@ export async function addVersion(
     await client.query(
       `UPDATE documents
           SET s3_key = $2, sha256 = $3, file_size = $4, file_name = $5, file_type = $6,
-              extracted_text = $7, page_count = $8, ai_status = $9
+              extracted_text = $7, page_count = $8, ai_status = $9,
+              ai_error = NULL, ai_analyzed_at = NULL
         WHERE id = $1`,
       [
         id,
@@ -852,7 +881,7 @@ export async function addVersion(
         file.mimetype || 'application/octet-stream',
         extracted.text,
         extracted.pageCount,
-        aiEnabled ? 'PENDING' : 'SKIPPED',
+        aiEnabled && (versionHasText || versionOcrCandidate) ? 'PENDING' : 'SKIPPED',
       ],
     );
     return inserted.rows[0].id;
@@ -865,7 +894,8 @@ export async function addVersion(
     { version_number: versionNumber, archived_key: archivedKey, sha256 },
   );
 
-  if (aiEnabled) enqueueAiAnalysis(id);
+  if (versionOcrCandidate) enqueueOcr(id);
+  else if (aiEnabled && versionHasText) enqueueAiAnalysis(id);
   notifyDocumentUpdated(id, doc.module_code as string);
 
   const versions = await listVersions(id);
@@ -1006,112 +1036,20 @@ export async function setDocumentTrd(user: AuthUser, id: string, documentType: s
   return getDocumentForUser(user, id);
 }
 
-// ── Cola de análisis con IA (concurrencia 2, 3 reintentos) ──
+// ── Cola de análisis con IA ─────────────────────────────────
+// La cola y la orquestación viven en `aiDocuments.ts`; aquí solo se
+// reexportan para no romper a los consumidores existentes.
 
-type QueueItem = { documentId: string; attempts: number };
+export { enqueueAiAnalysis, enqueueOcr, aiQueueSize };
 
-const aiQueue: QueueItem[] = [];
-const inFlight = new Set<string>();
-const MAX_CONCURRENCY = 2;
-const MAX_ATTEMPTS = 3;
-let running = 0;
-
-export function enqueueAiAnalysis(documentId: string): void {
-  if (!isAiConfigured()) return;
-  if (inFlight.has(documentId) || aiQueue.some((i) => i.documentId === documentId)) return;
-  aiQueue.push({ documentId, attempts: 0 });
-  drainQueue();
-}
-
-function drainQueue(): void {
-  while (running < MAX_CONCURRENCY && aiQueue.length > 0) {
-    const item = aiQueue.shift();
-    if (!item) break;
-    running += 1;
-    inFlight.add(item.documentId);
-    void processAiItem(item).finally(() => {
-      running -= 1;
-      inFlight.delete(item.documentId);
-      drainQueue();
-    });
-  }
-}
-
-async function processAiItem(item: QueueItem): Promise<void> {
-  try {
-    const doc = await one<{ file_name: string; extracted_text: string | null; module_code: string }>(
-      'SELECT file_name, extracted_text, module_code FROM documents WHERE id = $1 AND deleted_at IS NULL',
-      [item.documentId],
-    );
-    if (!doc) return;
-
-    if (!doc.extracted_text || doc.extracted_text.trim().length < 40) {
-      await query('UPDATE documents SET ai_status = $2 WHERE id = $1', [item.documentId, 'SKIPPED']);
-      return;
-    }
-
-    const result = await analyzeDocument(doc.file_name, doc.extracted_text);
-
-    await withTransaction(async (client) => {
-      await client.query('UPDATE documents SET summary = $2, ai_status = $3 WHERE id = $1', [
-        item.documentId,
-        result.summary,
-        'DONE',
-      ]);
-      if (result.tags.length > 0) {
-        await client.query(
-          'INSERT INTO document_tags (document_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING',
-          [item.documentId, result.tags],
-        );
-      }
-    });
-
-    notifyDocumentUpdated(item.documentId, doc.module_code);
-  } catch (error) {
-    if (item.attempts + 1 < MAX_ATTEMPTS) {
-      aiQueue.push({ documentId: item.documentId, attempts: item.attempts + 1 });
-      logger.warn({ err: error, documentId: item.documentId }, 'Reintentando análisis de IA');
-      return;
-    }
-    logger.error({ err: error, documentId: item.documentId }, 'Análisis de IA fallido');
-    await query('UPDATE documents SET ai_status = $2 WHERE id = $1', [item.documentId, 'FAILED']).catch(
-      () => undefined,
-    );
-  }
-}
-
-export function aiQueueSize(): number {
-  return aiQueue.length + inFlight.size;
-}
-
-/** Análisis síncrono (botón "Regenerar" y endpoint `/ai/analyze`). */
+/** Análisis síncrono (botón "Regenerar", `/ai/analyze`, `/documents/:id/ai/analyze`). */
 export async function analyzeDocumentNow(
   user: AuthUser,
   documentId: string,
-): Promise<{ summary: string; tags: string[] }> {
-  const doc = await getDocumentForUser(user, documentId);
-  const row = await one<{ extracted_text: string | null }>(
-    'SELECT extracted_text FROM documents WHERE id = $1',
-    [documentId],
-  );
-  if (!row?.extracted_text) {
-    throw ApiError.unprocessable('El documento no tiene texto extraído para analizar.');
-  }
-  const result = await analyzeDocument(doc.file_name, row.extracted_text);
-  await withTransaction(async (client) => {
-    await client.query('UPDATE documents SET summary = $2, ai_status = $3 WHERE id = $1', [
-      documentId,
-      result.summary,
-      'DONE',
-    ]);
-    if (result.tags.length > 0) {
-      await client.query(
-        'INSERT INTO document_tags (document_id, tag) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING',
-        [documentId, result.tags],
-      );
-    }
-  });
-  return result;
+  options: { includeMetadata?: boolean } = {},
+): Promise<AnalyzeOutcome> {
+  await getDocumentForUser(user, documentId);
+  return runAnalyze(documentId, { user, includeMetadata: options.includeMetadata });
 }
 
 // ── Papelera / purga física ─────────────────────────────────

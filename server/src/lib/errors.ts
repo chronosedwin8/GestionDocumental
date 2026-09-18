@@ -11,6 +11,8 @@ export type ErrorCode =
   | 'AI_NOT_CONFIGURED'
   | 'SMTP_NOT_CONFIGURED'
   | 'HASH_MISMATCH'
+  | 'ALREADY_HAS_TEXT'
+  | 'NO_TEXT'
   | 'PAYLOAD_TOO_LARGE'
   | 'UNSUPPORTED_MEDIA_TYPE'
   | 'INTERNAL';
@@ -45,6 +47,14 @@ export class ApiError extends Error {
   }
   static conflict(message: string, details?: unknown): ApiError {
     return new ApiError(409, 'CONFLICT', message, details);
+  }
+  static alreadyHasText(
+    message = 'El documento ya tiene texto extraído. Envía "force": true para volver a reconocerlo.',
+  ): ApiError {
+    return new ApiError(409, 'ALREADY_HAS_TEXT', message);
+  }
+  static noText(message: string): ApiError {
+    return new ApiError(422, 'NO_TEXT', message);
   }
   static unprocessable(message: string, details?: unknown): ApiError {
     return new ApiError(422, 'VALIDATION_ERROR', message, details);

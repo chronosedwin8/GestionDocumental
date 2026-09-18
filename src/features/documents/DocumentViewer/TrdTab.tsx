@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { CalendarClock, Save } from 'lucide-react';
+import { CalendarClock, Save, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as aiApi from '@/api/ai';
 import * as documentsApi from '@/api/documents';
 import { ApiError } from '@/api/client';
 import { useCatalogs } from '@/contexts/CatalogContext';
+import { useAiConfidenceThreshold } from '@/hooks/useAiHealth';
 import { useQuery } from '@/hooks/useQuery';
+import { AiSuggestionList } from '@/components/ai/AiSuggestionList';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -13,7 +16,7 @@ import { FormField } from '@/components/ui/FormField';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDate, relativeDays } from '@/lib/format';
-import type { ApiDocument } from '@/types/api';
+import type { AiClassification, ApiDocument } from '@/types/api';
 
 export interface TrdTabProps {
   document: ApiDocument;
@@ -22,10 +25,14 @@ export interface TrdTabProps {
 }
 
 export function TrdTab({ document, canWrite, onUpdated }: TrdTabProps): React.JSX.Element {
-  const { dispositionLabel, dispositionColor, disposition } = useCatalogs();
+  const { dispositionLabel, dispositionColor, disposition, settings } = useCatalogs();
+  const threshold = useAiConfidenceThreshold();
   const trd = useQuery(`document:${document.id}:trd`, () => documentsApi.getDocumentTrd(document.id));
   const [selected, setSelected] = useState('');
   const [saving, setSaving] = useState(false);
+  const [suggestion, setSuggestion] = useState<AiClassification | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [aiError, setAiError] = useState<ApiError | null>(null);
 
   if (trd.loading) return <Skeleton className="h-40 w-full" />;
   if (trd.error) return <ApiErrorState error={trd.error} onRetry={() => void trd.refetch()} />;
@@ -49,6 +56,29 @@ export function TrdTab({ document, canWrite, onUpdated }: TrdTabProps): React.JS
   };
 
   const dispositionAction = rule ? disposition(rule.disposition_code)?.action : undefined;
+
+  /**
+   * Sugerencia sobre el documento ya guardado (`POST /ai/classify` con
+   * `document_id`): aquí el servidor sí tiene el texto extraído, así que
+   * funciona también con PDF y escaneos. Aceptar una candidata solo rellena
+   * el selector: la reclasificación sigue exigiendo pulsar "Aplicar".
+   */
+  const suggest = async (): Promise<void> => {
+    setSuggesting(true);
+    setAiError(null);
+    try {
+      setSuggestion(await aiApi.classify({ document_id: document.id }));
+    } catch (err) {
+      setSuggestion(null);
+      setAiError(
+        err instanceof ApiError
+          ? err
+          : new ApiError('INTERNAL', 'No se pudo obtener la sugerencia.', 0),
+      );
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -132,6 +162,34 @@ export function TrdTab({ document, canWrite, onUpdated }: TrdTabProps): React.JS
               >
                 Aplicar
               </Button>
+              {settings?.ai_enabled !== false && (
+                <Button
+                  variant="outline"
+                  loading={suggesting}
+                  onClick={() => void suggest()}
+                  icon={<Sparkles className="h-4 w-4" />}
+                >
+                  {suggestion ? 'Volver a sugerir' : 'Sugerir con IA'}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {aiError && <ApiErrorState className="mt-3" error={aiError} onRetry={() => void suggest()} />}
+
+          {suggestion && (
+            <div className="mt-3 space-y-2">
+              <p className="text-[11px] text-content-muted">
+                La IA propone; nada cambia hasta que elijas una candidata y pulses «Aplicar».
+              </p>
+              <AiSuggestionList
+                fieldLabel="Tipo documental (TRD)"
+                suggestions={suggestion.document_type}
+                value={selected}
+                knownValues={candidates.map((candidate) => candidate.document_type)}
+                threshold={threshold}
+                onAccept={(value) => setSelected(value)}
+              />
             </div>
           )}
         </section>

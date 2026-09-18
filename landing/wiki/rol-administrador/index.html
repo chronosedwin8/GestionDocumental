@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rol Administrador (ADMIN) en EduArchive SGDEA: guía</title>
+  <meta name="description" content="Qué hace el rol ADMIN en EduArchive SGDEA: crear usuarios, definir la matriz de acceso por dependencia, configurar el almacenamiento y revisar la auditoría.">
+  <meta name="keywords" content="administrador SGDEA, matriz de acceso, roles y permisos, configuración S3, auditoría documental, usuarios">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://eduarchive.com.co/wiki/rol-administrador/">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Rol Administrador (ADMIN) en EduArchive SGDEA: guía">
+  <meta property="og:description" content="Qué hace el rol ADMIN en EduArchive SGDEA: crear usuarios, definir la matriz de acceso por dependencia, configurar el almacenamiento y revisar la auditoría.">
+  <meta property="og:image" content="https://eduarchive.com.co/img/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="EduArchive SGDEA: archivo electrónico que cumple la norma colombiana">
+  <meta property="og:url" content="https://eduarchive.com.co/wiki/rol-administrador/">
+  <meta property="og:locale" content="es_CO">
+  <meta property="og:site_name" content="EduArchive SGDEA">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Rol Administrador (ADMIN) en EduArchive SGDEA: guía">
+  <meta name="twitter:description" content="Qué hace el rol ADMIN en EduArchive SGDEA: crear usuarios, definir la matriz de acceso por dependencia, configurar el almacenamiento y revisar la auditoría.">
+  <meta name="twitter:image" content="https://eduarchive.com.co/img/og-image.png">
+  <meta name="twitter:image:alt" content="EduArchive SGDEA: archivo electrónico que cumple la norma colombiana">
+  <meta name="theme-color" content="#0a0c07">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="../../css/styles.css">
+  <link rel="stylesheet" href="../../css/wiki.css">
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Inicio",
+      "item": "https://eduarchive.com.co/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Ayuda",
+      "item": "https://eduarchive.com.co/wiki/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Administrador",
+      "item": "https://eduarchive.com.co/wiki/rol-administrador/"
+    }
+  ]
+}</script>
+  <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Administrador: el rol que sostiene el sistema",
+  "description": "Qué hace el rol ADMIN en EduArchive SGDEA: crear usuarios, definir la matriz de acceso por dependencia, configurar el almacenamiento y revisar la auditoría.",
+  "inLanguage": "es-CO",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://eduarchive.com.co/wiki/rol-administrador/"
+  },
+  "image": "https://eduarchive.com.co/img/og-image.png",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "Ayuda de EduArchive SGDEA",
+    "url": "https://eduarchive.com.co/wiki/"
+  },
+  "about": "Administrador",
+  "keywords": "administrador SGDEA, matriz de acceso, roles y permisos, configuración S3, auditoría documental, usuarios",
+  "author": {
+    "@type": "Organization",
+    "name": "EduArchive SGDEA",
+    "url": "https://eduarchive.com.co/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "EduArchive SGDEA",
+    "url": "https://eduarchive.com.co/"
+  }
+}</script>
+</head>
+<body class="page-wiki page-doc">
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+  <header class="site-header" id="top">
+    <div class="shell site-header__inner">
+      <a class="brand" href="../../index.html">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span class="brand__name">EduArchive<span class="brand__tail">SGDEA</span></span>
+      </a>
+      <nav class="site-nav" id="site-nav" aria-label="Navegación principal">
+        <ul>
+          <li><a href="../../index.html#beneficios">Beneficios</a></li>
+          <li><a href="../../index.html#capacidades">Capacidades</a></li>
+          <li><a href="../../index.html#modulos">Módulos</a></li>
+          <li><a href="../../index.html#normativa">Normativa</a></li>
+          <li><a href="../../index.html#galeria">Galería</a></li>
+          <li><a href="../../index.html#planes">Planes</a></li>
+          <li><a class="is-current" href="../../wiki/">Ayuda</a></li>
+        </ul>
+      </nav>
+      <a class="btn btn--ghost site-header__cta" href="../../index.html#contacto">Hablar con ventas</a>
+      <button class="nav-toggle" type="button" aria-label="Abrir el menú de navegación" aria-expanded="false" aria-controls="site-nav">
+        <span aria-hidden="true"></span>
+      </button>
+    </div>
+  </header>
+  <nav class="breadcrumbs" aria-label="Ruta de navegación">
+      <ol class="shell">
+        <li><a href="../../index.html">Inicio</a></li>
+        <li><a href="../">Ayuda</a></li>
+        <li aria-current="page">Administrador</li>
+      </ol>
+    </nav>
+  <main id="contenido">
+    <article class="doc">
+      <div class="shell doc__grid">
+        <div class="doc__main">
+          <p class="doc__eyebrow">Guía por rol · ADMIN</p>
+          <h1>Administrador: el rol que sostiene el sistema</h1>
+          <p class="doc__lead">Qué hace el rol ADMIN en EduArchive SGDEA: crear usuarios, definir la matriz de acceso por dependencia, configurar el almacenamiento y revisar la auditoría.</p>
+          <dl class="facts">
+            <div><dt>Código del rol</dt><dd><code>ADMIN</code></dd></div>
+            <div><dt>Nombre en el sistema</dt><dd>Administrador</dd></div>
+            <div><dt>Dependencias que ve</dt><dd>Las 11 dependencias, con lectura y escritura, más la configuración del sistema</dd></div>
+          </dl>
+          <div class="prose">
+<h2 id="para-que-sirve-eduarchive-en-este-puesto">Para qué sirve EduArchive en este puesto</h2>
+<p>El administrador no es quien archiva: es quien deja el sistema en condiciones para que los demás archiven bien. Su trabajo se concentra en cuatro frentes. Primero, la <strong>identidad</strong>: quién tiene usuario, con qué rol y sobre qué dependencias. Segundo, la <strong>configuración técnica</strong>: el almacenamiento en Amazon S3, el correo saliente, el tamaño máximo de archivo, los tipos de archivo permitidos y los días que un documento permanece en la papelera. Tercero, las <strong>reglas archivísticas</strong>: que la Tabla de Retención Documental de la institución esté cargada y que las categorías correspondan a las series y subseries reales. Y cuarto, la <strong>vigilancia</strong>: revisar la auditoría, las sesiones abiertas y las solicitudes de eliminación.</p>
+<p>Si el administrador hace bien su parte, ningún usuario tiene que preguntarse si un documento quedó guardado, si alguien más puede verlo o si se va a borrar solo.</p>
+<h2 id="que-ve-y-que-no-ve">Qué ve y qué no ve</h2>
+<p>El rol ADMIN tiene <strong>acceso total</strong>: lectura y escritura en las once dependencias, sin excepción, y además las pantallas de administración que ningún otro rol ve.</p>
+<div class="table-scroll"><table><thead><tr><th scope="col">Puede</th><th scope="col">No puede</th></tr></thead><tbody><tr><td>Crear, editar, desactivar usuarios y asignarles rol y dependencias</td><td>Recuperar la contraseña de otro usuario: solo puede generar una temporal</td></tr><tr><td>Modificar la matriz de acceso rol por dependencia</td><td>Leer un documento sin dejar rastro: cada consulta queda en la cadena de custodia</td></tr><tr><td>Cargar y editar la Tabla de Retención Documental</td><td>Alterar la auditoría: el registro es de solo lectura</td></tr><tr><td>Configurar Amazon S3, el correo saliente y las políticas del sistema</td><td>Ver las credenciales en el navegador: viven cifradas en el servidor</td></tr><tr><td>Aprobar solicitudes de eliminación y purgar la papelera</td><td>Eliminar sin que se genere el acta correspondiente</td></tr></tbody></table></div>
+<p>Un detalle importante: las credenciales de Amazon S3 y la clave del servicio de inteligencia artificial <strong>nunca llegan al navegador</strong>. Se guardan cifradas en el servidor y el panel las muestra enmascaradas. Aunque seas administrador, no vas a poder copiarlas desde la pantalla.</p>
+<h2 id="tareas-frecuentes">Tareas frecuentes</h2>
+<h3 id="poner-el-sistema-en-marcha-por-primera-vez">Poner el sistema en marcha por primera vez</h3>
+<ol><li>Configura el almacenamiento en <strong>Administración → Sistema</strong>: bucket de Amazon S3, región y credenciales. Usa la prueba de conexión antes de continuar; si el almacenamiento no está configurado, el sistema rechaza las cargas en vez de simularlas.</li><li>Configura el correo saliente. Sin correo, el restablecimiento de contraseña se hace a mano desde el panel con una contraseña temporal.</li><li>Revisa la <strong>Tabla de Retención Documental</strong>: cada tipo documental de cada dependencia debe tener años de retención y disposición final (conservar, seleccionar o eliminar).</li><li>Revisa las <strong>categorías</strong> de cada dependencia para que correspondan a las series y subseries de la institución.</li><li>Crea los <strong>usuarios</strong> con su rol y su dependencia. Un usuario creado sin rol queda como <code>SIN_ASIGNAR</code> y no ve nada hasta que le asignes uno.</li><li>Crea las <strong>personas</strong> (empleados y estudiantes) o delega esa carga en Talento Humano y en la secretaría académica.</li></ol>
+<p>La lista de puesta en marcha del panel va marcando estos puntos con datos reales y desaparece sola cuando están todos completos.</p>
+<h3 id="dar-acceso-a-una-persona-nueva">Dar acceso a una persona nueva</h3>
+<ol><li>Crea el usuario con su correo institucional y su nombre completo.</li><li>Asigna el <strong>rol</strong> que corresponda a su puesto. El rol define el acceso por defecto a las dependencias.</li><li>Asigna la <strong>dependencia</strong> a la que pertenece la persona.</li><li>Si necesita ver una dependencia adicional que su rol no incluye, añádela en sus dependencias permitidas: eso amplía su acceso sin cambiar el rol ni afectar a sus compañeros.</li><li>Entrégale la contraseña temporal. El sistema le exigirá cambiarla en el primer ingreso.</li></ol>
+<h3 id="revisar-la-auditoria">Revisar la auditoría</h3>
+<p>La auditoría registra quién hizo qué y cuándo, y se puede exportar a Excel para un comité o para una visita de control. Conviene revisarla con una rutina fija: intentos de ingreso fallidos, eliminaciones aprobadas, cambios de configuración y descargas masivas. Cada documento tiene además su propia <strong>cadena de custodia</strong>, que es inmutable y muestra el recorrido completo de ese expediente concreto.</p>
+<h3 id="atender-una-solicitud-de-eliminacion">Atender una solicitud de eliminación</h3>
+<ol><li>Abre la bandeja de solicitudes de eliminación en el panel.</li><li>Contrasta el motivo con la Tabla de Retención Documental: si la disposición final del tipo documental es conservar, la solicitud no procede.</li><li>Aprueba o rechaza dejando constancia del motivo.</li><li>Al aprobar, el documento pasa a la papelera con su periodo de gracia; la eliminación definitiva genera un <strong>acta de eliminación en PDF</strong> que queda archivada.</li></ol>
+<h2 id="errores-comunes">Errores comunes</h2>
+<ul><li><strong>Dar el rol ADMIN &quot;por si acaso&quot;.</strong> El administrador ve y escribe en todo. Si alguien solo necesita consultar, el rol correcto es Auditor; si necesita gestionar el archivo, es Archivista.</li><li><strong>Dejar usuarios en <code>SIN_ASIGNAR</code>.</strong> No es un estado de espera aceptable: la persona no puede trabajar y suele terminar pidiendo prestado el usuario de un compañero, que es lo peor que le puede pasar a la trazabilidad.</li><li><strong>Cambiar la matriz de acceso sin avisar.</strong> Quitar una dependencia a un rol afecta a todas las personas que lo tienen. Conviene anunciarlo antes.</li><li><strong>Configurar el almacenamiento a medias.</strong> Si la conexión falla, las cargas se rechazan con un mensaje explícito. El sistema no guarda documentos &quot;a medias&quot; ni finge que subieron.</li><li><strong>Purgar la papelera para liberar espacio.</strong> La papelera es parte del procedimiento, no un desorden. Purgar antes de tiempo destruye la posibilidad de restaurar.</li></ul>
+<h2 id="a-quien-acudir">A quién acudir</h2>
+<ul><li><strong>Dudas archivísticas</strong> (qué serie, cuántos años, qué disposición): el archivista de la institución.</li><li><strong>Decisiones de gobierno</strong> (quién puede ver la información de junta directiva, política de conservación): rectoría.</li><li><strong>Fallas del servidor, el almacenamiento o el correo</strong>: el equipo de EduArchive, con el identificador de la petición que aparece en el mensaje de error.</li></ul>
+          </div>
+          <aside class="related" aria-labelledby="related-title">
+        <h2 class="related__title" id="related-title">Seguir por aquí</h2>
+        <ul>
+          <li><a href="../rol-rectoria/"><span class="related__kind">Rol</span><span class="related__name">Rectoría</span></a></li>
+          <li><a href="../rol-archivista/"><span class="related__kind">Rol</span><span class="related__name">Archivista</span></a></li>
+          <li><a href="../guia-papelera-y-eliminacion/"><span class="related__kind">Procedimiento crítico</span><span class="related__name">Papelera y eliminación</span></a></li>
+        </ul>
+      </aside>
+        </div>
+        <div class="doc__aside">
+          <nav class="toc" aria-labelledby="toc-title">
+          <h2 class="toc__title" id="toc-title">En esta página</h2>
+          <ol>
+            <li><a href="#para-que-sirve-eduarchive-en-este-puesto">Para qué sirve EduArchive en este puesto</a></li>
+            <li><a href="#que-ve-y-que-no-ve">Qué ve y qué no ve</a></li>
+            <li><a href="#tareas-frecuentes">Tareas frecuentes</a></li>
+            <li><a href="#errores-comunes">Errores comunes</a></li>
+            <li><a href="#a-quien-acudir">A quién acudir</a></li>
+          </ol>
+        </nav>
+          <aside class="callout" aria-labelledby="callout-title">
+            <h2 class="callout__title" id="callout-title">¿Esta guía no resuelve tu caso?</h2>
+            <p>Escribe al administrador del sistema de tu institución o al equipo de EduArchive.</p>
+            <a class="btn btn--acid btn--sm" href="mailto:ventas@eduarchive.com">Escribir a soporte</a>
+          </aside>
+        </div>
+      </div>
+    </article>
+  </main>
+  <footer class="site-footer">
+    <div class="shell site-footer__grid">
+      <div>
+        <a class="brand" href="../../index.html">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">EduArchive<span class="brand__tail">SGDEA</span></span>
+        </a>
+        <p class="site-footer__note">Sistema de Gestión de Documentos Electrónicos de Archivo para instituciones educativas colombianas. En producción en la Corporación Cultural Colegio Alemán de Barranquilla.</p>
+      </div>
+      <div>
+        <h2 class="site-footer__title">Producto</h2>
+        <ul class="site-footer__list">
+          <li><a href="../../index.html#beneficios">Beneficios para la institución</a></li>
+          <li><a href="../../index.html#capacidades">Capacidades del sistema</a></li>
+          <li><a href="../../index.html#modulos">Módulos departamentales</a></li>
+          <li><a href="../../index.html#planes">Planes y precios</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="site-footer__title">Ayuda</h2>
+        <ul class="site-footer__list">
+          <li><a href="../../wiki/">Wiki de ayuda por rol</a></li>
+          <li><a href="../../wiki/guia-subir-y-clasificar/">Subir y clasificar documentos</a></li>
+          <li><a href="../../wiki/guia-trd-y-transferencias/">TRD y transferencias</a></li>
+          <li><a href="../../wiki/glosario-archivistico/">Glosario archivístico</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="site-footer__title">Contacto</h2>
+        <ul class="site-footer__list">
+          <li><a href="mailto:ventas@eduarchive.com">ventas@eduarchive.com</a></li>
+            <li>1350 NW 55th St, Fort Lauderdale</li>
+            <li>770 NW 96th Ave, Doral, FL 33172</li>
+        </ul>
+      </div>
+    </div>
+    <div class="shell site-footer__bottom">
+      <p>&copy; 2026 EduArchive SGDEA. Todos los derechos reservados.</p>
+      <p>Ley 594 de 2000 · Ley 1581 de 2012 · Acuerdos del Archivo General de la Nación</p>
+    </div>
+  </footer>
+  <script src="../../js/main.js" defer></script>
+  
+</body>
+</html>

@@ -3,6 +3,7 @@ import {
   Activity,
   BookOpen,
   BookUser,
+  Bot,
   CalendarRange,
   Clock,
   Cloud,
@@ -19,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { HelpButton } from '@/components/help/HelpButton';
 import { Tabs } from '@/components/ui/Tabs';
+import { AiTab } from './tabs/AiTab';
 import { AuditTab } from './tabs/AuditTab';
 import { CatalogsTab } from './tabs/CatalogsTab';
 import { CategoriesTab } from './tabs/CategoriesTab';
@@ -112,6 +114,13 @@ const TAB_DEFS: AdminTabDef[] = [
     icon: <LayoutList className="h-3.5 w-3.5" aria-hidden />,
     fullAccessOnly: true,
     render: () => <CatalogsTab />,
+  },
+  {
+    id: 'ia',
+    label: 'IA',
+    icon: <Bot className="h-3.5 w-3.5" aria-hidden />,
+    fullAccessOnly: true,
+    render: () => <AiTab />,
   },
   {
     id: 'sistema',

@@ -5,18 +5,22 @@ import * as aiApi from '@/api/ai';
 import * as documentsApi from '@/api/documents';
 import { ApiError } from '@/api/client';
 import { useCatalogs } from '@/contexts/CatalogContext';
+import { AiStatusIndicator } from '@/components/ai/AiStatusIndicator';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { formatBytes, formatDate, formatDateTime } from '@/lib/format';
+import { OcrNotice } from './OcrNotice';
 import type { ApiDocument } from '@/types/api';
 
 export interface InfoTabProps {
   document: ApiDocument;
   canWrite: boolean;
   onUpdated: (document: ApiDocument) => void;
+  /** Vuelve a pedir el documento al servidor (tras reconocer texto, p. ej.). */
+  onRefresh?: () => void;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
@@ -28,7 +32,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function InfoTab({ document, canWrite, onUpdated }: InfoTabProps): React.JSX.Element {
+export function InfoTab({ document, canWrite, onUpdated, onRefresh }: InfoTabProps): React.JSX.Element {
   const { statusLabel, statusColor, moduleLabel, moduleColor, settings } = useCatalogs();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(document.title);
@@ -36,6 +40,7 @@ export function InfoTab({ document, canWrite, onUpdated }: InfoTabProps): React.
   const [saving, setSaving] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const allowsEdit = canWrite;
 
@@ -96,8 +101,36 @@ export function InfoTab({ document, canWrite, onUpdated }: InfoTabProps): React.
     }
   };
 
+  /** Reintento del análisis fallido/pendiente (`POST /documents/:id/ai/analyze`). */
+  const retryAnalysis = async (): Promise<void> => {
+    setRetrying(true);
+    try {
+      const result = await documentsApi.reanalyze(document.id);
+      onUpdated({
+        ...document,
+        ai_status: result.ai_status,
+        ai_error: result.ai_status === 'FAILED' ? document.ai_error : null,
+        ...(result.summary !== undefined ? { summary: result.summary } : {}),
+        ...(result.tags !== undefined ? { tags: result.tags } : {}),
+      });
+      toast.success(
+        result.ai_status === 'PENDING' ? 'Análisis reencolado.' : 'Análisis actualizado.',
+      );
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo reintentar el análisis.');
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
+      <OcrNotice
+        document={document}
+        canWrite={canWrite}
+        onRecognized={() => onRefresh?.()}
+      />
+
       <section>
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className="font-display text-sm text-content-primary">Identificación</h3>
@@ -175,16 +208,22 @@ export function InfoTab({ document, canWrite, onUpdated }: InfoTabProps): React.
             </Button>
           )}
         </div>
+        <AiStatusIndicator
+          variant="block"
+          status={document.ai_status}
+          error={document.ai_error ?? null}
+          retrying={retrying}
+          {...(allowsEdit && settings?.ai_enabled !== false
+            ? { onRetry: () => void retryAnalysis() }
+            : {})}
+        />
+
         {document.summary ? (
-          <p className="whitespace-pre-line text-sm text-content-secondary">{document.summary}</p>
+          <p className="mt-2 whitespace-pre-line text-sm text-content-secondary">{document.summary}</p>
         ) : (
-          <p className="text-sm text-content-muted">
-            {document.ai_status === 'PENDING'
-              ? 'El análisis automático está en cola.'
-              : document.ai_status === 'FAILED'
-                ? 'El análisis automático falló. Puedes reintentarlo.'
-                : 'Este documento no tiene resumen.'}
-          </p>
+          document.ai_status === 'DONE' && (
+            <p className="text-sm text-content-muted">Este documento no tiene resumen.</p>
+          )
         )}
       </section>
 

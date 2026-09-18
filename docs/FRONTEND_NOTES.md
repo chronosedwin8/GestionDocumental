@@ -181,3 +181,101 @@ servidor**: los tipos del cliente se ajustaron a lo que responde de verdad.
 7. **Sin cobertura E2E automatizada.** Las 64 pruebas son unitarias y de
    componente (vitest + Testing Library); el extremo a extremo se comprobó con
    `curl` contra el servidor y el proxy reales.
+
+---
+
+## 11. Fase 5 — Capacidades de IA en la interfaz
+
+Implementa `docs/AI_ANALISIS.md` §3 (contrato de IA) en el cliente. Regla que
+atraviesa toda la fase: **la IA propone y una persona confirma**; ninguna
+pantalla aplica una sugerencia por su cuenta ni inventa datos cuando la IA no
+está configurada.
+
+### 11.1 Qué se construyó
+
+| Punto | Pantalla / componente | Rutas consumidas |
+|---|---|---|
+| Sugerencia de clasificación al cargar | `features/documents/AiClassificationPanel.tsx` dentro del paso 2 de `UploadWizard` | `POST /ai/classify` (forma `{ module_code, file_name, text }`) |
+| Sugerencia sobre un documento ya guardado | `DocumentViewer/TrdTab` (rellena el selector, **no** reclasifica) | `POST /ai/classify` (forma `{ document_id }`) |
+| Reconocimiento óptico | `DocumentViewer/OcrNotice.tsx`, en la pestaña Info | `POST /ai/ocr`, `GET /documents/:id/text` |
+| Metadatos extraídos | `DocumentViewer/MetadataTab` | `POST /ai/extract-metadata` (`persist: false`) + `PUT /documents/:id/metadata` con `is_extracted`/`confidence` |
+| Estado del análisis | `components/ai/AiStatusIndicator.tsx` (visor, cabecera del visor, columna «IA» de `DocumentTable`, resultados semánticos) | `documents.ai_status` / `ai_error`, reintento con `POST /documents/:id/ai/analyze` |
+| Motivos de la búsqueda semántica | `features/search/SemanticResults.tsx` | `POST /search/semantic` → `matches[]` |
+| Citas del chat | `DocumentViewer/ChatSources.tsx` + evento `sources` en `streamSse` | `POST /ai/chat` |
+| Panel de IA en Administración | `features/admin/tabs/AiTab.tsx` + `AiUsagePanel.tsx` (pestaña `/admin/ia`) | `GET /ai/health`, `GET /ai/usage`, `POST /ai/reprocess` |
+
+### 11.2 Decisiones
+
+- **Cómo se distingue lo sugerido de lo confirmado.** Toda propuesta lleva la
+  insignia «Sugerido/Propuesto por IA» con su confianza; el campo del
+  formulario permanece vacío y rotulado «Sin confirmar» hasta que alguien pulsa
+  «Usar esta», momento en el que pasa a «Confirmado por una persona». En
+  metadatos, lo guardado por una persona lleva la insignia «Escrito por una
+  persona» y lo extraído «Extraído por IA {confianza}».
+- **Confianza e incertidumbre sin umbral en el cliente.** El servidor marca
+  cada propuesta con `uncertain` (calculado con
+  `system_config.ai_confidence_threshold`). La interfaz respeta esa marca; si
+  faltara, usa el umbral que publique el servidor (`settings` o `/ai/health`) y,
+  si tampoco existe, **no califica**: muestra el porcentaje tal cual.
+- **`extract-metadata` se pide con `persist: false`.** Los campos se muestran
+  como propuesta y se guardan uno a uno con `PUT /documents/:id/metadata`
+  marcando `is_extracted: true` y la confianza del modelo. Reemplazar un valor
+  escrito por una persona exige confirmación (`DialogContext.confirm`); el botón
+  masivo solo guarda las propuestas sin conflicto y dice cuántas son.
+- **Sugerir al cargar solo funciona con archivos de texto.** `POST /ai/classify`
+  en su forma previa a guardar exige una muestra de `text`; el navegador no
+  puede extraer texto de un PDF o de una imagen sin librerías. Para esos
+  formatos no se ofrece el botón (no se manda una petición condenada) y se
+  explica que la sugerencia estará disponible en la pestaña TRD del documento,
+  donde el servidor ya tiene el texto extraído.
+- **Propuestas fuera del catálogo.** Si la IA devuelve un tipo o una serie que
+  no existe en la TRD/categorías del módulo, la tarjeta se muestra con el aviso
+  «No existe en el catálogo» y su botón queda deshabilitado.
+- **Detección de «sin texto».** No hay campo en `Document` que lo indique: se
+  usa `GET /documents/:id/text` y se considera sin texto cuando viene vacío. Es
+  una petición extra por documento abierto; la cache de `useQuery` la comparte
+  con las citas del chat.
+- **Colores de la gráfica de consumo.** `hooks/useTokenColors.ts` resuelve las
+  variables de `tokens.css` a color real con `getComputedStyle`, porque recharts
+  pinta con atributos SVG donde `var(--x)` no se sustituye de forma fiable. No
+  hay paleta escrita en el componente.
+- **Confirmación del reproceso masivo.** El diálogo declara alcance,
+  dependencia, límite y el recuento que publica `/ai/health`
+  (`failed_last_24h`, `pending`, `without_text`) según el alcance elegido;
+  cuando el servidor no publica ese dato, lo dice en lugar de estimarlo. El
+  número exacto encolado se informa después, con el desglose `jobs` de la
+  respuesta.
+
+### 11.3 Desviaciones del contrato observadas en el servidor real
+
+| Ruta | Contrato (§3) | Servidor real | Efecto en el cliente |
+|---|---|---|---|
+| `GET /ai/health` | `{ configured, model, vision_model, queue_depth, failed_last_24h }` | añade `pending`, `without_text`, `cache_entries`, `metadata_fields` | Campos opcionales en `AiHealth`; el panel los muestra y los usa en la confirmación del reproceso. |
+| `GET /ai/usage` | `totals: {...}` sin definir | `calls`, `input_tokens`, `output_tokens`, `cached_hits`, `failed`, `estimated_cost`, `currency` | `AiUsageTotals` con todo opcional; si faltara, la tabla suma las filas. |
+| `POST /ai/ocr` | `{ text_chars, page_count, pages_processed }` | `page_count` puede ser `null`; añade `cached` y `message` | El aviso redacta el resultado sin inventar el total de páginas. |
+| `POST /ai/reprocess` | `{ queued }` | añade `scope` y `jobs: { analyze, ocr }` | Se informa el desglose real. |
+| `POST /ai/extract-metadata` | `{ fields }` | añade `persisted` (null con `persist:false`) | Tipado como opcional. |
+| `POST /ai/classify` | `{ module_code, file_name, text }` | `text` exige 20 caracteres mínimo | Ver decisión sobre archivos binarios. |
+| `AiSuggestion` / `AiExtractedField` | `{ value, confidence, reason }` | añaden `uncertain` | La marca del servidor manda sobre cualquier umbral local. |
+| `/ai/usage`, `/ai/reprocess` | «solo administración» | `requireFullAccess` | La pestaña `/admin/ia` es `fullAccessOnly`. |
+
+### 11.4 Problemas conocidos de la Fase 5
+
+1. **No hay recuento previo por alcance para el reproceso.** `/ai/health`
+   publica `failed_last_24h`, `pending` y `without_text`, pero no el número de
+   documentos del alcance `ALL` ni el filtrado por dependencia; la confirmación
+   lo dice en lugar de estimarlo.
+2. **Las citas del chat se resaltan sobre el texto extraído, no sobre el PDF.**
+   `ChatSources` abre el fragmento con la cita marcada; no se puede resaltar
+   dentro del visor porque la vista previa es una URL prefirmada de S3 en un
+   `iframe`. Si la cita no aparece literalmente en el texto, se dice.
+3. **El asistente de carga no puede sugerir con PDF ni imágenes** (ver 11.2).
+4. **`GET /documents/:id/text` se pide para saber si hay texto**: sería más
+   barato un campo `has_text`/`text_chars` en `Document`.
+5. **La columna «IA» de la tabla no ordena**: `ai_status` no está en la lista
+   de columnas ordenables del servidor, así que no se anuncia como ordenable.
+6. **Verificación E2E con la IA apagada.** En esta máquina no hay
+   `GEMINI_API_KEY`: `/ai/health` responde `configured:false` y las rutas de
+   escritura devuelven 503 `AI_NOT_CONFIGURED`, que es justamente el camino de
+   estado vacío honesto que se comprobó. Las respuestas con IA encendida no se
+   han visto en vivo.

@@ -78,14 +78,42 @@ Además de los mínimos del contrato se emiten:
 
 ## 6. IA
 
-- `POST /ai/chat` emite eventos SSE `token` y `done`; si el modelo falla a mitad del stream se
-  emite un evento **`error`** con `{ message }` antes de cerrar (el contrato no lo contemplaba).
-- `POST /documents/:id/ai/analyze` **encola** el análisis y responde `{ ai_status: 'PENDING' }`;
-  `POST /ai/analyze` lo ejecuta de forma **síncrona** y devuelve `{ summary, tags }`.
-- Sin `GEMINI_API_KEY`: los endpoints de IA responden 503 `AI_NOT_CONFIGURED` y los documentos
-  nuevos quedan con `ai_status = 'SKIPPED'` (también cuando el archivo no tiene texto
-  extraíble, p. ej. imágenes sin OCR).
-- `POST /search/semantic` sin IA responde 503 `AI_NOT_CONFIGURED`.
+Motor reescrito según `docs/AI_ANALISIS.md` (migración `012_ai_engine.sql`, semilla
+`008_ai_config.sql`). El contrato completo de las rutas nuevas está en la sección
+**«IA — motor ampliado»** de `docs/API_CONTRACT.md`.
+
+### Comportamiento general
+
+- La clave se lee de `env.GEMINI_API_KEY` y, si falta, de `system_config.gemini_api_key`
+  (cifrada con AES-256-GCM). Nunca aparece en logs ni en auditoría; `GET /system/config` la
+  devuelve enmascarada.
+- Sin clave: todas las rutas de IA y `POST /search/semantic` responden **503
+  `AI_NOT_CONFIGURED`**, y los documentos nuevos quedan con `ai_status = 'SKIPPED'`.
+- **Nunca se simula.** Si el reconocimiento óptico no encuentra texto, `extracted_text` queda
+  nulo y la respuesta lo dice; si el modelo falla, `ai_status = 'FAILED'` con el motivo en
+  `ai_error` y `summary` **no** guarda el texto del error.
+- **La IA sugiere, la persona decide**: `/ai/classify` y `/ai/extract-metadata` no modifican
+  `documents.type`, `category`, `subcategory` ni `retention_end_date`.
+
+### Decisiones concretas
+
+| Punto | Decisión |
+|---|---|
+| **Rasterización de PDF** | No se rasteriza. Rasterizar en Windows sin binarios externos (poppler/ImageMagick) ni módulos nativos (`canvas`) no es fiable, así que el PDF **completo** se envía a Gemini como `inline_data` con `application/pdf`, formato que admite de forma nativa. Como la API no acepta rangos de páginas, `system_config.ai_ocr_max_pages` se aplica como instrucción de transcripción y se informa en `pages_processed`. `ai_ocr_max_file_mb` (18 MB) protege el límite de tamaño de la petición. |
+| **`analyze_chars`** | Cambia de significado: era el recorte del documento (3.000 caracteres) y ahora es el **tamaño del bloque**. La migración eleva el valor heredado ≤ 3.000 a 12.000. `analyze_max_chunks` (24) acota cuántos bloques se procesan y `analyze_chunk_overlap` (600) el solapamiento. |
+| **Análisis en dos pasos** | Con un solo bloque se hace una única llamada; con varios, una llamada breve por bloque más una consolidación final. `AiAnalyzeResult` expone `chunks`, `analyzed_chars` y `total_chars` para que la interfaz pueda mostrar la cobertura real. |
+| **Salida estructurada** | `responseMimeType: application/json` + `responseSchema` en analyze, classify, extract-metadata y el ranking semántico. Se eliminó el parseo por expresiones regulares. El OCR es la única llamada de texto libre (devuelve la transcripción literal). |
+| **Validación contra catálogo** | Toda propuesta de `classify` que no exista literalmente en `retention_rules.document_type` / `document_categories` del módulo se descarta en el servidor, aunque el modelo la devuelva. Lo mismo con las claves de `extract-metadata` frente a `system_config.ai_metadata_fields`. |
+| **Confianza** | Se muestra tal cual la declara el modelo. Por debajo de `ai_confidence_threshold` la sugerencia se marca `uncertain: true`; **no** se descarta ni se acepta en silencio. |
+| **Etiquetas** | Al prompt viajan las etiquetas más usadas del módulo (`ai_tag_vocabulary_size`) y sus series. La normalización pasa a minúsculas **conservando la tilde** y deduplica por clave sin tilde y sin plural evidente, reutilizando la grafía ya existente (`Nómina`, `nomina` y `nóminas` colapsan en una). |
+| **Caché** | `ai_cache`, clave `sha256(contenido normalizado) + operación + modelo + versión del prompt`. La huella depende **solo del contenido**, de modo que reanalizar el mismo documento no vuelve a pagar aunque haya cambiado el vocabulario del módulo. `PROMPT_VERSION` en `aiClient.ts` invalida la caché cuando se edita un prompt. |
+| **Uso** | `ai_usage` guarda los tokens **reales** de `usageMetadata` de Gemini, la duración, el documento, el usuario, el acierto de caché y si la llamada fracasó. El acierto de caché se registra con 0 tokens. `GET /ai/usage` agrega por operación y estima el costo con `system_config.ai_pricing`. |
+| **Cola** | La cola pasó de `documents.ts` a `aiDocuments.ts` y admite dos tipos de trabajo (`ANALYZE`, `OCR`) con concurrencia 2 y 3 intentos. Los fallos definitivos (sin texto, formato sin visión, ya tiene texto) no se reintentan. Al subir un archivo sin texto extraíble cuyo MIME admita visión se encola OCR y, si encuentra texto, encadena el análisis. |
+| **Chat** | El contexto sale del texto **completo** seleccionando ventanas por relevancia a la pregunta (antes se cortaba a 100.000 caracteres desde el principio). Tras el stream se emite `sources` con citas cuyo `offset` es la posición real en `extracted_text`; si una cita no se puede localizar literalmente, no se devuelve. |
+| **Búsqueda semántica** | Preselección en tres etapas explícitas (`strategy`: `lexical` → `trigram` → `module_recency`). Cada candidato viaja con un fragmento real del contenido (`ts_headline`). Se devuelven `matches` con motivo y puntuación, filtrando los identificadores que el modelo no haya tomado de la lista y los que queden por debajo de `ai_semantic.min_score`. |
+| **Custodia** | El reconocimiento óptico registra un evento de custodia de tipo `OCR` (`CustodyEventType` lo incluye). |
+| **`POST /documents/:id/ai/analyze`** | Deja de encolar y devolver `{ ai_status: 'PENDING' }`: ahora ejecuta el análisis y devuelve `{ summary, tags, ai_status }`, como fija `docs/AI_ANALISIS.md` §3. |
+| **Códigos nuevos** | **409 `ALREADY_HAS_TEXT`** (OCR sobre un documento que ya tiene texto sin `force`) y **422 `NO_TEXT`** (clasificar, extraer o analizar sin texto extraído). |
 
 ## 7. Datos semilla
 

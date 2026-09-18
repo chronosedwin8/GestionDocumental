@@ -20,6 +20,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Tabs } from '@/components/ui/Tabs';
 import { DocumentTable } from '../documents/DocumentTable';
 import { DocumentViewer } from '../documents/DocumentViewer';
+import { SemanticResults } from './SemanticResults';
 import type { SemanticSearchResult } from '@/types/api';
 
 type Mode = 'semantica' | 'texto' | 'avanzada';
@@ -240,18 +241,10 @@ export default function SearchPage(): React.JSX.Element {
                   description="Prueba con otras palabras o usa la búsqueda avanzada."
                 />
               ) : (
-                <DocumentTable
+                <SemanticResults
                   documents={semResult.documents}
-                  loading={false}
-                  page={1}
-                  pageSize={semResult.documents.length}
-                  total={semResult.documents.length}
-                  sort=""
-                  order="desc"
-                  onSortChange={() => undefined}
-                  onPageChange={() => undefined}
+                  matches={semResult.matches ?? []}
                   onOpen={(doc) => openDocument(doc.id)}
-                  showModule
                 />
               )}
             </>

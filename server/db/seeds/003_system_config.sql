@@ -76,7 +76,11 @@ INSERT INTO system_config (key, value, is_secret, description) VALUES
    'Modelo de Gemini usado por el servidor'),
 
   ('ai_limits',
-   '{"analyze_max_tokens": 700, "search_max_tokens": 800, "chat_max_tokens": 1024,
-     "analyze_chars": 3000, "chat_chars": 100000}'::jsonb,
-   false, 'Límites de tokens y de contexto por acción de IA')
+   '{"analyze_max_tokens": 900, "search_max_tokens": 1200, "chat_max_tokens": 1024,
+     "analyze_chars": 12000, "analyze_max_chunks": 24, "analyze_chunk_overlap": 600,
+     "classify_chars": 8000, "classify_max_tokens": 900,
+     "metadata_chars": 16000, "metadata_max_tokens": 1200,
+     "ocr_max_tokens": 8192, "chat_chars": 100000}'::jsonb,
+   false,
+   'Límites de tokens y de contexto por acción de IA. `analyze_chars` es el TAMAÑO DEL BLOQUE del análisis por partes (no un recorte del documento); `analyze_max_chunks` acota cuántos bloques se procesan.')
 ON CONFLICT (key) DO NOTHING;

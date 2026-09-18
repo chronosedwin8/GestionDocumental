@@ -122,6 +122,8 @@ export interface PublicSettings {
   auto_folio?: boolean;
   hr_module_code?: string;
   academic_module_code?: string;
+  /** Umbral de confianza de la IA, si el servidor lo publica en `settings`. */
+  ai_confidence_threshold?: number;
 }
 
 export interface Catalogs {
@@ -224,6 +226,12 @@ export interface ApiDocument {
   author?: DocumentAuthor | null;
   summary: string | null;
   ai_status: AiStatus;
+  /**
+   * Motivo del fallo del análisis. El contrato de IA lo añade a `documents`;
+   * se declara opcional para tolerar servidores anteriores a ese cambio.
+   */
+  ai_error?: string | null;
+  ai_analyzed_at?: string | null;
   category: string | null;
   subcategory: string | null;
   person_id: string | null;
@@ -701,9 +709,19 @@ export type MonthlyStatsRow = { month: string } & Record<string, string | number
 
 /* --------------------------------------------------------------- búsqueda */
 
+/** Motivo y puntuación con que la IA justifica un resultado semántico. */
+export interface SemanticMatch {
+  document_id: string;
+  reason: string;
+  /** Puntuación declarada por el modelo (0..1 según el contrato de IA). */
+  score: number;
+}
+
 export interface SemanticSearchResult {
   explanation: string;
   documents: ApiDocument[];
+  /** Opcional: los servidores anteriores al contrato de IA no lo envían. */
+  matches?: SemanticMatch[];
 }
 
 export interface GlobalSearchResult {
@@ -717,11 +735,144 @@ export interface GlobalSearchResult {
 export interface AiAnalyzeResult {
   summary: string;
   tags: string[];
+  /** Añadido por el contrato de IA; opcional para servidores anteriores. */
+  ai_status?: AiStatus;
 }
 
 export interface ChatHistoryEntry {
   role: 'user' | 'ai';
   text: string;
+}
+
+/** Cita textual que el chat emite en el evento SSE `sources`. */
+export interface AiChatSource {
+  quote: string;
+  offset: number;
+}
+
+/** Una candidata propuesta por la IA. `confidence` va de 0 a 1. */
+export interface AiSuggestion {
+  value: string;
+  confidence: number;
+  reason: string;
+  /**
+   * El servidor marca la propuesta como incierta comparando su confianza con
+   * `system_config.ai_confidence_threshold`. El cliente respeta esa marca en
+   * lugar de aplicar un umbral propio.
+   */
+  uncertain?: boolean;
+}
+
+/** Campos de clasificación que propone `POST /ai/classify`. */
+export interface AiClassification {
+  /** Hasta 3, ordenadas por confianza; `value` = `retention_rules.document_type`. */
+  document_type: AiSuggestion[];
+  /** Hasta 3; `value` = `document_categories.name` (serie del módulo). */
+  serie: AiSuggestion[];
+  subserie: AiSuggestion[];
+  /** Solo si el contenido sugiere otra dependencia. */
+  module_code: AiSuggestion | null;
+}
+
+export interface AiExtractedField {
+  key: string;
+  value: string;
+  confidence: number;
+  /** Marcado por el servidor según su umbral de confianza. */
+  uncertain?: boolean;
+}
+
+/** Resultado de persistir metadatos extraídos (solo con `persist: true`). */
+export interface AiMetadataPersistResult {
+  saved: number;
+  /** Claves que no se tocaron porque las había escrito una persona. */
+  skipped_human: string[];
+}
+
+export interface AiExtractMetadataResult {
+  fields: AiExtractedField[];
+  persisted?: AiMetadataPersistResult | null;
+}
+
+export interface AiOcrResult {
+  text_chars: number;
+  /** El servidor puede no conocer el total de páginas. */
+  page_count: number | null;
+  pages_processed: number;
+  cached?: boolean;
+  message?: string;
+}
+
+export type AiOperation =
+  | 'ANALYZE'
+  | 'CLASSIFY'
+  | 'EXTRACT_METADATA'
+  | 'OCR'
+  | 'SEMANTIC'
+  | 'CHAT';
+
+export interface AiUsageRow {
+  operation: AiOperation;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cached_hits: number;
+}
+
+/**
+ * El contrato no fija las claves de `totals`; se declaran opcionales y la
+ * interfaz las recalcula desde `rows` cuando el servidor no las envía.
+ */
+export interface AiUsageTotals {
+  calls?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cached_hits?: number;
+  /** Llamadas fallidas del periodo (lo añade el servidor). */
+  failed?: number;
+  /** Costo estimado con la tarifa de `system_config.ai_pricing`. */
+  estimated_cost?: number;
+  currency?: string;
+}
+
+export interface AiUsageResult {
+  rows: AiUsageRow[];
+  totals: AiUsageTotals;
+  period: { from: string; to: string };
+}
+
+export interface AiHealth {
+  configured: boolean;
+  model: string | null;
+  vision_model: string | null;
+  queue_depth: number;
+  failed_last_24h: number;
+  /** Extras que publica el servidor además de lo que fija el contrato. */
+  pending?: number;
+  without_text?: number;
+  cache_entries?: number;
+  metadata_fields?: number;
+  /**
+   * Umbral de confianza por debajo del cual una sugerencia se marca como
+   * incierta. No está en la tabla del contrato: si el servidor no lo publica,
+   * la interfaz no inventa ninguno y muestra la confianza tal cual.
+   */
+  confidence_threshold?: number;
+}
+
+export type AiReprocessScope = 'FAILED' | 'PENDING' | 'NO_TEXT' | 'ALL';
+
+export interface AiReprocessInput {
+  scope: AiReprocessScope;
+  module_code?: string;
+  limit?: number;
+}
+
+export interface AiReprocessResult {
+  queued: number;
+  scope?: AiReprocessScope;
+  /** Desglose real de trabajos encolados por el servidor. */
+  jobs?: { analyze: number; ocr: number };
 }
 
 /* --------------------------------------------------------- SSE de eventos */

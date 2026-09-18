@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { FileText, Hash } from 'lucide-react';
+import { AiStatusIndicator } from '@/components/ai/AiStatusIndicator';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { BookmarkButton } from '@/components/ui/BookmarkButton';
@@ -95,6 +96,18 @@ export function DocumentTable({
         header: 'Estado',
         sortField: 'status_code',
         render: (doc) => <Badge color={statusColor(doc.status_code)}>{statusLabel(doc.status_code)}</Badge>,
+      },
+      {
+        key: 'ai',
+        header: 'IA',
+        // El servidor no ordena por `ai_status`: la columna no se anuncia
+        // como ordenable para no prometer algo que no ocurre.
+        render: (doc) =>
+          doc.ai_status === 'DONE' ? (
+            <span className="text-xs text-content-muted">—</span>
+          ) : (
+            <AiStatusIndicator status={doc.ai_status} error={doc.ai_error ?? null} />
+          ),
       },
       {
         key: 'author',

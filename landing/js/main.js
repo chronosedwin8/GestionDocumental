@@ -1,111 +1,92 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Menu mobile toggle
-    const mobileMenuBtn = document.getElementById('mobile-menu');
-    const navLinks = document.querySelector('.nav-links');
+/**
+ * EduArchive SGDEA — comportamiento del sitio público.
+ *
+ * Se carga con `defer` en todas las páginas (portada y wiki), así que cada
+ * bloque comprueba que su elemento exista antes de actuar. Sin dependencias.
+ * Las preguntas frecuentes usan <details>/<summary> nativos: no necesitan JS.
+ */
 
-    if (mobileMenuBtn && navLinks) {
-        mobileMenuBtn.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------------------------
+   * Menú de navegación en pantallas estrechas
+   * ------------------------------------------------------------------- */
+  var toggle = document.querySelector('.nav-toggle');
+  var nav = document.getElementById('site-nav');
+
+  if (toggle && nav) {
+    var closeNav = function () {
+      nav.classList.remove('is-open');
+      toggle.setAttribute('aria-expanded', 'false');
+    };
+
+    toggle.addEventListener('click', function () {
+      var open = nav.classList.toggle('is-open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    nav.addEventListener('click', function (event) {
+      if (event.target.closest('a')) closeNav();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && nav.classList.contains('is-open')) {
+        closeNav();
+        toggle.focus();
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * Aparición progresiva de secciones
+   * ------------------------------------------------------------------- */
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var revealables = document.querySelectorAll('.reveal');
+
+  if (revealables.length) {
+    if (reduced.matches || typeof IntersectionObserver === 'undefined') {
+      revealables.forEach(function (el) { el.classList.add('is-visible'); });
+    } else {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
         });
+      }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
+
+      revealables.forEach(function (el, index) {
+        el.style.transitionDelay = Math.min(index % 4, 3) * 60 + 'ms';
+        observer.observe(el);
+      });
     }
+  }
 
-    // Cerrar menú al hacer clic en un enlace (mobile)
-    const links = document.querySelectorAll('.nav-links a');
-    links.forEach(link => {
-        link.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
-                navLinks.classList.remove('active');
-            }
-        });
+  /* ---------------------------------------------------------------------
+   * Enlace activo de la navegación de la portada
+   * ------------------------------------------------------------------- */
+  var sections = document.querySelectorAll('main section[id]');
+  var navLinks = nav ? nav.querySelectorAll('a[href*="#"]') : [];
+
+  if (sections.length && navLinks.length && typeof IntersectionObserver !== 'undefined') {
+    var byId = {};
+    navLinks.forEach(function (link) {
+      var hash = link.getAttribute('href').split('#')[1];
+      if (hash) byId[hash] = link;
     });
 
-    // Accordion FAQ logic
-    const accordions = document.querySelectorAll('.accordion-header');
-    
-    accordions.forEach(accordion => {
-        accordion.addEventListener('click', function() {
-            // Cerrar otros acordeones si se desea (opcional, aquí permitimos múltiples abiertos)
-            /*
-            accordions.forEach(acc => {
-                if (acc !== this) {
-                    acc.classList.remove('active');
-                    acc.nextElementSibling.style.maxHeight = null;
-                }
-            });
-            */
-            
-            this.classList.toggle('active');
-            
-            const content = this.nextElementSibling;
-            if (content.style.maxHeight) {
-                content.style.maxHeight = null;
-                this.querySelector('.icon').textContent = '+';
-            } else {
-                content.style.maxHeight = content.scrollHeight + "px";
-                this.querySelector('.icon').textContent = '−';
-            }
-        });
-    });
-
-    // Añadir clase scrolled al navbar al bajar
-    const navbar = document.querySelector('.navbar');
-    window.addEventListener('scroll', () => {
-        if (window.scrollY > 50) {
-            navbar.style.background = 'rgba(10, 10, 10, 0.9)';
-            navbar.style.boxShadow = '0 4px 30px rgba(0, 0, 0, 0.5)';
-        } else {
-            navbar.style.background = 'rgba(24, 24, 27, 0.7)';
-            navbar.style.boxShadow = 'none';
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var link = byId[entry.target.id];
+        if (!link) return;
+        if (entry.isIntersecting) {
+          navLinks.forEach(function (other) { other.classList.remove('is-current'); });
+          link.classList.add('is-current');
         }
-    });
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
 
-    // Gallery Logic
-    const track = document.getElementById('gallery-track');
-    const prevBtn = document.getElementById('prev-btn');
-    const nextBtn = document.getElementById('next-btn');
-    const indicatorsContainer = document.getElementById('gallery-indicators');
-    
-    if (track) {
-        const slides = Array.from(track.children);
-        let currentIndex = 0;
-
-        // Create indicators
-        slides.forEach((_, index) => {
-            const dot = document.createElement('div');
-            dot.classList.add('indicator');
-            if (index === 0) dot.classList.add('active');
-            dot.addEventListener('click', () => goToSlide(index));
-            indicatorsContainer.appendChild(dot);
-        });
-
-        const indicators = Array.from(indicatorsContainer.children);
-
-        const updateGallery = () => {
-            track.style.transform = `translateX(-${currentIndex * 100}%)`;
-            indicators.forEach((dot, index) => {
-                dot.classList.toggle('active', index === currentIndex);
-            });
-        };
-
-        const goToSlide = (index) => {
-            currentIndex = index;
-            updateGallery();
-        };
-
-        const nextSlide = () => {
-            currentIndex = (currentIndex + 1) % slides.length;
-            updateGallery();
-        };
-
-        const prevSlide = () => {
-            currentIndex = (currentIndex - 1 + slides.length) % slides.length;
-            updateGallery();
-        };
-
-        if (nextBtn) nextBtn.addEventListener('click', nextSlide);
-        if (prevBtn) prevBtn.addEventListener('click', prevSlide);
-
-        // Auto slide
-        setInterval(nextSlide, 5000);
-    }
-});
+    sections.forEach(function (section) { spy.observe(section); });
+  }
+}());

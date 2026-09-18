@@ -43,8 +43,37 @@ export type AiLimits = {
   analyze_max_tokens: number;
   search_max_tokens: number;
   chat_max_tokens: number;
+  /** Tamaño del BLOQUE del análisis por partes (no un recorte del documento). */
   analyze_chars: number;
+  analyze_max_chunks: number;
+  analyze_chunk_overlap: number;
+  classify_chars: number;
+  classify_max_tokens: number;
+  metadata_chars: number;
+  metadata_max_tokens: number;
+  ocr_max_tokens: number;
   chat_chars: number;
+};
+
+export type AiMetadataField = { key: string; label: string; hint?: string };
+
+export type AiSemanticConfig = {
+  snippet_chars: number;
+  max_candidates_to_model: number;
+  trigram_threshold: number;
+  min_score: number;
+};
+
+export type AiChatSourcesConfig = {
+  max_sources: number;
+  min_quote_chars: number;
+  max_quote_chars: number;
+};
+
+export type AiPricing = {
+  currency: string;
+  input_per_million: number;
+  output_per_million: number;
 };
 
 const cache = new Map<string, { value: unknown; at: number }>();
@@ -112,8 +141,12 @@ export async function listConfig(): Promise<ConfigRow[]> {
   );
   return rows.map((row) => {
     if (!row.is_secret) return row;
-    const decoded = decodeValue(row) as Record<string, unknown> | null;
+    const decoded = decodeValue(row) as Record<string, unknown> | string | null;
     if (!decoded) return { ...row, value: null };
+    // Secreto de un solo valor (p. ej. gemini_api_key): solo pista, nunca el valor.
+    if (typeof decoded !== 'object') {
+      return { ...row, value: { masked: true, hint: maskHint(String(decoded)) } };
+    }
     const hintSource =
       (decoded['access_key_id'] as string | undefined) ??
       (decoded['user'] as string | undefined) ??
@@ -174,8 +207,52 @@ export async function getSmtpConfig(): Promise<SmtpConfig | null> {
   };
 }
 
-export function isAiConfigured(): boolean {
-  return nonEmpty(env.GEMINI_API_KEY);
+/**
+ * Clave de Gemini: variable de entorno primero, luego `system_config.gemini_api_key`
+ * (cifrada en base de datos). Nunca se registra en logs ni en auditoría.
+ */
+export async function getAiApiKey(): Promise<string | null> {
+  if (nonEmpty(env.GEMINI_API_KEY)) return env.GEMINI_API_KEY;
+  const stored = await getConfig<unknown>('gemini_api_key');
+  if (nonEmpty(stored as string | null | undefined)) return (stored as string).trim();
+  if (stored !== null && typeof stored === 'object') {
+    const key = (stored as { api_key?: string; value?: string }).api_key ?? (stored as { value?: string }).value;
+    if (nonEmpty(key)) return key.trim();
+  }
+  return null;
+}
+
+export async function isAiEnabled(): Promise<boolean> {
+  return (await getAiApiKey()) !== null;
+}
+
+export const DEFAULT_AI_LIMITS: AiLimits = {
+  analyze_max_tokens: 900,
+  search_max_tokens: 1200,
+  chat_max_tokens: 1024,
+  analyze_chars: 12_000,
+  analyze_max_chunks: 24,
+  analyze_chunk_overlap: 600,
+  classify_chars: 8_000,
+  classify_max_tokens: 900,
+  metadata_chars: 16_000,
+  metadata_max_tokens: 1_200,
+  ocr_max_tokens: 8_192,
+  chat_chars: 100_000,
+};
+
+/** Límites de IA con los valores por defecto rellenados si faltan subclaves. */
+export async function getAiLimits(): Promise<AiLimits> {
+  const stored = await getConfigOr<Partial<AiLimits>>('ai_limits', {});
+  return { ...DEFAULT_AI_LIMITS, ...stored };
+}
+
+export async function getAiModel(): Promise<string> {
+  return getConfigOr<string>('ai_model', env.GEMINI_MODEL);
+}
+
+export async function getAiVisionModel(): Promise<string> {
+  return getConfigOr<string>('ai_vision_model', await getAiModel());
 }
 
 export async function getPasswordPolicy(): Promise<PasswordPolicy> {
@@ -211,7 +288,7 @@ export async function getPublicSettings(): Promise<Record<string, unknown>> {
     password_min_length: policy.min_length,
     app_name: appName,
     institution_name: institution,
-    ai_enabled: isAiConfigured(),
+    ai_enabled: await isAiEnabled(),
     storage_configured: aws !== null,
     smtp_configured: smtp !== null,
     require_trd: requireTrd,
@@ -232,7 +309,7 @@ export async function healthCheck(): Promise<Record<string, unknown>> {
     status: db ? 'ok' : 'degraded',
     db,
     storage_configured: storage !== null,
-    ai_configured: isAiConfigured(),
+    ai_configured: db ? await isAiEnabled() : false,
     smtp_configured: smtp !== null,
     version: env.APP_VERSION,
     uptime_s: Math.round(process.uptime()),

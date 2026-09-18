@@ -1,6 +1,7 @@
 import { api, uploadWithProgress } from './client';
 import type { UploadHandle, UploadProgress } from './client';
 import type {
+  AiAnalyzeResult,
   AiStatus,
   ApiDocument,
   CustodyEvent,
@@ -149,8 +150,23 @@ export function listMetadata(id: string): Promise<DocumentMetadataEntry[]> {
   return api.get<DocumentMetadataEntry[]>(`/documents/${id}/metadata`);
 }
 
-export function upsertMetadata(id: string, key: string, value: string): Promise<DocumentMetadataEntry[]> {
-  return api.put<DocumentMetadataEntry[]>(`/documents/${id}/metadata`, { key, value });
+/**
+ * Alta o actualización de un metadato. `origin` marca la procedencia: sin él
+ * el valor queda como escrito por una persona (`is_extracted = false`); con
+ * `{ is_extracted: true, confidence }` se guarda como propuesta de IA
+ * confirmada, conservando el porcentaje que declaró el modelo.
+ */
+export function upsertMetadata(
+  id: string,
+  key: string,
+  value: string,
+  origin?: { is_extracted: boolean; confidence: number | null },
+): Promise<DocumentMetadataEntry[]> {
+  return api.put<DocumentMetadataEntry[]>(`/documents/${id}/metadata`, {
+    key,
+    value,
+    ...(origin ?? {}),
+  });
 }
 
 export function deleteMetadata(id: string, key: string): Promise<DocumentMetadataEntry[]> {
@@ -228,8 +244,17 @@ export function listCustody(id: string): Promise<CustodyEvent[]> {
 
 /* ------------------------------------------------------------------- IA */
 
-export function reanalyze(id: string): Promise<{ ai_status: AiStatus }> {
-  return api.post<{ ai_status: AiStatus }>(`/documents/${id}/ai/analyze`);
+/**
+ * Reencola (o rehace) el análisis. El contrato de IA añadió
+ * `{ include_metadata? }` en el cuerpo y `{ summary, tags, ai_status }` en la
+ * respuesta; `summary`/`tags` se declaran opcionales en `AiAnalyzeResult`
+ * para tolerar el servidor anterior, que solo devolvía `ai_status`.
+ */
+export function reanalyze(
+  id: string,
+  options: { include_metadata?: boolean } = {},
+): Promise<AiAnalyzeResult & { ai_status: AiStatus }> {
+  return api.post<AiAnalyzeResult & { ai_status: AiStatus }>(`/documents/${id}/ai/analyze`, options);
 }
 
 /* ------------------------------------------------------------------ TRD */

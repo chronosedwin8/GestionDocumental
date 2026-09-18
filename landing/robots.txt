@@ -1,0 +1,5 @@
+# robots.txt de EduArchive SGDEA
+User-agent: *
+Allow: /
+
+Sitemap: https://eduarchive.com.co/sitemap.xml

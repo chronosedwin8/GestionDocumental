@@ -6,7 +6,8 @@ import { useCatalogs } from '@/contexts/CatalogContext';
 import { ApiErrorState } from '@/components/ui/ApiErrorState';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
-import type { ApiDocument } from '@/types/api';
+import { ChatSources } from './ChatSources';
+import type { AiChatSource, ApiDocument } from '@/types/api';
 import type { ChatMessage } from '@/types/ui';
 
 export interface ChatTabProps {
@@ -64,11 +65,21 @@ export function ChatTab({ document }: ChatTabProps): React.JSX.Element {
       });
     };
 
+    const attachSources = (sources: AiChatSource[]): void => {
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === 'ai') next[next.length - 1] = { ...last, sources };
+        return next;
+      });
+    };
+
     try {
       await aiApi.chat(
         { document_id: document.id, question: text, history },
         {
           onToken: appendToken,
+          onSources: attachSources,
           onDone: () => {
             setMessages((prev) => {
               const next = [...prev];
@@ -145,6 +156,9 @@ export function ChatTab({ document }: ChatTabProps): React.JSX.Element {
                 </span>
               ) : (
                 message.text
+              )}
+              {message.role === 'ai' && message.sources && message.sources.length > 0 && (
+                <ChatSources documentId={document.id} sources={message.sources} />
               )}
             </div>
             {message.role === 'user' && (

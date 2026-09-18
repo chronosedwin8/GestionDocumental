@@ -1,0 +1,23 @@
+{
+  "siteName": "EduArchive SGDEA",
+  "baseUrl": "https://eduarchive.com.co",
+  "locale": "es_CO",
+  "lang": "es",
+  "ogImage": "/img/og-image.png",
+  "ogImageAlt": "EduArchive SGDEA: archivo electrónico que cumple la norma colombiana",
+  "contact": {
+    "email": "ventas@eduarchive.com",
+    "addresses": [
+      "1350 NW 55th St, Fort Lauderdale",
+      "770 NW 96th Ave, Doral, FL 33172"
+    ]
+  },
+  "homeNav": [
+    { "href": "#beneficios", "label": "Beneficios" },
+    { "href": "#capacidades", "label": "Capacidades" },
+    { "href": "#modulos", "label": "Módulos" },
+    { "href": "#normativa", "label": "Normativa" },
+    { "href": "#galeria", "label": "Galería" },
+    { "href": "#planes", "label": "Planes" }
+  ]
+}

@@ -6,6 +6,7 @@ import {
   request,
   setAccessToken,
   setUnauthorizedHandler,
+  streamSse,
 } from './client';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -161,5 +162,43 @@ describe('api/client', () => {
   it('devuelve undefined en respuestas 204', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
     await expect(request('/notifications/read-all', { method: 'POST' })).resolves.toBeUndefined();
+  });
+
+  it('reparte los eventos token, sources y done del chat de IA', async () => {
+    const body = [
+      'event: token\ndata: {"text":"Según el acta, "}\n\n',
+      'event: token\ndata: {"text":"el plazo vence el 30 de junio."}\n\n',
+      'event: sources\ndata: [{"quote":"el plazo vence el 30 de junio","offset":420}]\n\n',
+      'event: done\ndata: {"ok":true}\n\n',
+    ].join('');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+      ),
+    );
+
+    const tokens: string[] = [];
+    let sources: { quote: string; offset: number }[] = [];
+    let done = false;
+
+    await streamSse(
+      '/ai/chat',
+      { document_id: 'doc-1', question: '¿Cuándo vence?' },
+      {
+        onToken: (text) => tokens.push(text),
+        onSources: (received) => {
+          sources = received;
+        },
+        onDone: () => {
+          done = true;
+        },
+      },
+    );
+
+    expect(tokens.join('')).toBe('Según el acta, el plazo vence el 30 de junio.');
+    expect(sources).toEqual([{ quote: 'el plazo vence el 30 de junio', offset: 420 }]);
+    expect(done).toBe(true);
   });
 });
